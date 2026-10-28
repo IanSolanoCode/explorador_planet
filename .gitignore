@@ -1,0 +1,42 @@
+# Sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editores
+.idea/
+.vscode/
+*.swp
+
+# Entornos y secretos
+.env
+.env.*
+!.env.example
+
+# Dependencias
+/vendor/
+node_modules/
+
+# Build y artefactos
+/dist/
+/build/
+/public/build/
+*.log
+
+# Laravel (api/)
+api/storage/*.key
+api/storage/framework/cache/*
+api/storage/framework/sessions/*
+api/storage/framework/views/*
+api/bootstrap/cache/*
+!api/storage/framework/cache/.gitignore
+!api/storage/framework/sessions/.gitignore
+!api/storage/framework/views/.gitignore
+!api/bootstrap/cache/.gitignore
+
+# Front (front/)
+front/.cache/
+front/coverage/
+
+# Temporales
+*.tmp
