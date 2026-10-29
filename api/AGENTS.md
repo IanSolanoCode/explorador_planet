@@ -9,7 +9,11 @@
 
 ## Estructura relevante
 
-- `routes/api.php` — rutas de la API (prefijo `/api`). Sin endpoints por ahora.
+- `routes/api.php` — endpoints `GET /api/countries/{code}/atlas`, `/radio` y `/tv`.
+- `app/Http/Controllers/` — un controlador invocable por módulo, con datos mock (MX, ES, AR).
+- `app/Http/Resources/` — normalizan el JSON de cada módulo.
+- `app/Services/` — placeholders vacíos para las integraciones externas.
+- `config/cors.php` — CORS habilitado para `api/*`.
 - `bootstrap/app.php` — registra solo las rutas de API y el health check nativo en `/up`.
 - `tests/Feature/ExampleTest.php` — comprueba que `/up` responde 200.
 

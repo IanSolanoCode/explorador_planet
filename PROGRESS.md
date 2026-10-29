@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-10-27
+Última actualización: 2026-10-28
 
 ## Hecho
 
@@ -14,6 +14,13 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Proyecto Laravel 13.39 limpio instalado en `api/` (PHP 8.4), en modo API: solo `routes/api.php`, sin rutas web, vistas ni assets de frontend.
 - `api/.env.example` configurado para MySQL (base `explorador_planet`). Sin migraciones ejecutadas ni tablas propias.
 - Servidor de desarrollo levantado con `php artisan serve`; `/up` responde 200.
+- Endpoints de ejemplo: `GET /api/countries/{code}/atlas`, `/radio` y `/tv`.
+- Un controlador por módulo (`AtlasController`, `RadioController`, `TvController`) con datos mock para MX, ES y AR.
+- API Resources: `CountryResource`, `RadioStationResource`, `TvChannelResource`.
+- Services vacíos: `IptvOrgService`, `RadioBrowserService`, `RestCountriesService`.
+- CORS habilitado en `config/cors.php` para `api/*`.
+- Validación de `{code}`: exactamente 2 letras; si no, `422` con mensaje claro en español.
+- Pruebas con curl de los tres endpoints (MX, códigos inválidos y atlas sin datos). Sin migraciones ni modelos.
 
 ## En curso
 
@@ -23,7 +30,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
 - Definir el stack concreto del front (librería 3D, framework de UI, build).
 - Crear el esqueleto de `front/` con el globo 3D.
-- Definir el contrato de la API: endpoints de países, módulos y datos.
+- Implementar los Services reales (IptvOrg, RadioBrowser, RestCountries) y sustituir los datos mock.
 - Elegir y documentar las fuentes externas de TV en vivo, radio y atlas.
 - Definir la estrategia de caché de la api para las fuentes externas.
 - Definir el modelo de datos de países y la relación con las fuentes.
@@ -42,10 +49,19 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Caché y sesiones usan el driver `file`, y las colas `sync`, para no depender de tablas mientras no haya migraciones propias.
 - Se conservan las migraciones por defecto de Laravel (users, cache, jobs) pero no se han ejecutado.
 - El health check nativo de Laravel en `/up` se usa para verificar que el servicio está vivo.
+- Los endpoints de módulos son `GET /api/countries/{code}/atlas`, `/radio` y `/tv`, con un controlador invocable por módulo.
+- El código de país se normaliza a mayúsculas y debe ser exactamente 2 letras ASCII; si no, la api responde `422` con `message` y `errors.code`.
+- Si el código es válido pero no hay datos de atlas, se responde `404` con un mensaje claro. TV y radio devuelven `{"data": []}`.
+- Las respuestas usan API Resources y van envueltas en `data` (objeto para atlas, lista para TV y radio).
+- El contrato de atlas incluye `code`, `name`, `officialName`, `capital`, `region`, `subregion`, `population`, `latlng`, `flag`, `languages` y `currencies`.
+- Los mocks existen solo para MX, ES y AR; las URLs de streams y logos son ficticias (`example.com`).
+- Los Services se crean vacíos como puntos de integración futura; los controladores no llaman a APIs externas.
+- CORS permite `GET` y `OPTIONS` desde cualquier origen para `api/*`.
 
 ### Problemas abiertos
 
 - Credenciales de MySQL local sin configurar: `root` sin contraseña devuelve error 1045, así que la conexión real a la base no se ha verificado.
+- Los mocks usan URLs ficticias: todavía no hay streams ni logos reales.
 - Stack del globo 3D sin decidir.
 - Fuentes de TV en vivo y radio sin evaluar (disponibilidad, licencias, geobloqueo, calidad del stream).
 - Cobertura de países del atlas sin definir.
