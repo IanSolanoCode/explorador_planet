@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-10-31
+Última actualización: 2026-11-01
 
 ## Hecho
 
@@ -52,15 +52,25 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - `Favorite::MAX_PER_USER = 200`.
 - Migraciones ejecutadas en MySQL (`explorador_planet_db`): usuarios, cache, jobs, tokens, rol, favoritos y bloqueos.
 - Verificación transaccional: el rol por defecto es `user`; un token de prueba nace con `expires_at` a 30 días; tras el rollback no quedaron usuarios de prueba.
+- **Etapa 3 completada**: endpoints `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout` y `GET /api/auth/me`.
+- `RegisterRequest` valida nombre, email único y contraseña de mínimo 8 caracteres con mayúsculas, minúsculas, números y confirmación; rechaza cualquier presencia de `role` con `422`.
+- `LoginRequest` normaliza el email; las credenciales incorrectas devuelven `422` con el mensaje genérico `Credenciales incorrectas.`, sin revelar si el email existe.
+- Los emails se normalizan a minúsculas en `prepareForValidation()` de ambos FormRequests.
+- Rate limits nombrados en `AppServiceProvider`: `login` 5/min por email + IP y `register` 5/min por IP; al excederse responden `429` en JSON.
+- `AuthController` crea cada token con `expires_at` explícito de 30 días; `logout` revoca solo el token actual y responde `204`; `me` devuelve el usuario autenticado.
+- `UserResource` expone únicamente `id`, `name`, `email` y `role`; nunca `password` ni tokens.
+- `bootstrap/app.php` anula la redirección de invitados a `route('login')`, de modo que un `/api/*` sin token responde `401` JSON en lugar de `500`.
+- Pruebas con curl: registro `201`, `role=admin` `422`, email duplicado `422`, contraseña débil `422`, login `200`, contraseña incorrecta `422`, intentos 1-5 `422` y el sexto `429`, `/me` con token `200`, `/me` sin token `401`, ruta inexistente `404` JSON, logout `204` y `/me` con token revocado `401`.
+- Verificación en MySQL del usuario de prueba: `role=user`, email almacenado en minúsculas, contraseña bcrypt (no texto plano), `password_check=true` y token con `expires_at=2026-12-01 05:07:07` (~30 días).
+- Limpieza final: 1 usuario de prueba eliminado, 0 usuarios y 0 tokens de prueba restantes.
 
 ## En curso
 
 - Servidor de desarrollo `php artisan serve` activo en http://127.0.0.1:8000 (health check en `/up`).
-- Etapas 1 y 2 completadas. Detenido a la espera de aprobación para empezar la etapa 3 (autenticación).
+- Etapas 1, 2 y 3 completadas. Detenido a la espera de aprobación para empezar la etapa 4 (administración).
 
 ## Pendiente
 
-- **Etapa 3**: endpoints `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout` y `GET /api/auth/me`; validación, rate limits y tokens.
 - **Etapa 4**: comando `admin:create`, `config/admin.php` y middleware de administrador.
 - **Etapa 5**: endpoints de favoritos, límite de 200, duplicados y rechazo de items bloqueados.
 - **Etapa 6**: endpoints de administración de bloqueos.
@@ -112,7 +122,14 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Si iptv-org falla, la api responde `502` con `iptv_org_unavailable`; un país sin canales responde `200` con `data: []`.
 - El endpoint `/tv/adult` existe y está separado de `/tv`, pero **casi siempre devolverá `data: []`**: solo hay 2 canales NSFW con stream en todo el dataset de iptv-org y ninguno está en MX, ES o CO.
 - La autenticación usará Sanctum con tokens Bearer; no habrá autenticación por cookies ni CSRF de SPA.
-- Los tokens de Sanctum expiran a los 30 días. La configuración central es `sanctum.expiration = 43200`; en la etapa 3 se pasará además `expires_at` explícito al crear cada token.
+- Los tokens de Sanctum expiran a los 30 días. La configuración central es `sanctum.expiration = 43200`; además, cada token creado en la etapa 3 recibe `expires_at` explícito de 30 días.
+- Las rutas `POST /auth/register` y `POST /auth/login` son públicas; `POST /auth/logout` y `GET /auth/me` usan `auth:sanctum`.
+- Las respuestas de registro y login usan `{"data":{"user":{...},"token":"..."}}`; `/me` usa `{"data":{...}}` y logout responde `204` sin cuerpo.
+- La contraseña se valida con mínimo 8 caracteres, mayúsculas, minúsculas, números y confirmación. El registro rechaza cualquier presencia de `role` mediante la regla `missing`, y `role` sigue fuera de `$fillable`.
+- Los emails se normalizan a minúsculas antes de validar y guardar. El login inválido responde `422` con un mensaje genérico para no filtrar la existencia del email.
+- Los rate limits se registran como limitadores nombrados: `login` 5/min por email + IP y `register` 5/min por IP. El sexto intento devuelve `429` JSON.
+- Todos los errores de `/api/*` se renderizan como JSON. `bootstrap/app.php` anula la redirección de invitados y `shouldRenderJsonWhen` cubre `401`, `404`, `429` y el resto de errores de la API.
+- `UserResource` es la única representación pública del usuario y expone solo `id`, `name`, `email` y `role`.
 - El JSON nuevo usará `camelCase` para mantener consistencia con TV y radio: `itemId`, `streamUrl`, `blockedBy`, `createdAt`. En la base se usan columnas `snake_case`.
 - En favoritos, `streamUrl` y `logo` solo aceptarán esquemas `http` y `https`; la validación se implementará en la etapa 5.
 - Los DELETE de favoritos y bloqueos usan el `id` numérico; si el recurso no pertenece al usuario, se responde `404`.
@@ -125,6 +142,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
 - La conexión MySQL funciona y las migraciones están ejecutadas en `explorador_planet_db`; las credenciales están en `api/.env`.
 - La extensión PHP `intl` no está instalada: `php artisan db:show` falla al formatear la lista de tablas. `migrate` y `php artisan db:table --json` funcionan; no afecta a la base.
+- En local `APP_DEBUG=true` añade trazas a los JSON de `404` y `429`; el cuerpo sigue siendo JSON, pero en producción debe desactivarse para no exponer detalles internos.
 - El mock de atlas usa URLs ficticias; todavía no hay fuente real de atlas.
 - Stack del globo 3D sin decidir.
 - La fuente de radio (Radio Browser) y la de TV (iptv-org) están integradas; queda por evaluar la fuente de atlas.
