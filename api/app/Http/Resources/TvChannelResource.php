@@ -19,6 +19,8 @@ class TvChannelResource extends JsonResource
             'streamUrl' => $this->resource['streamUrl'],
             'logo' => $this->resource['logo'],
             'category' => $this->resource['category'],
+            'source' => $this->resource['source'],
+            'secure' => $this->resource['secure'],
         ];
     }
 }

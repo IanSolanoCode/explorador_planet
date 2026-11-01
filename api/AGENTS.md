@@ -9,10 +9,10 @@
 
 ## Estructura relevante
 
-- `routes/api.php` — endpoints `GET /api/countries/{code}/atlas`, `/radio` y `/tv`.
-- `app/Http/Controllers/` — un controlador invocable por módulo. `RadioController` usa Radio Browser; TV y atlas conservan datos mock (MX, ES, AR).
+- `routes/api.php` — endpoints `GET /api/countries/{code}/atlas`, `/radio`, `/tv` y `/tv/adult`.
+- `app/Http/Controllers/` — un controlador invocable por módulo. `RadioController` usa Radio Browser, `TvController` usa iptv-org y atlas conserva datos mock (MX, ES, AR).
 - `app/Http/Resources/` — normalizan el JSON de cada módulo.
-- `app/Services/` — `RadioBrowserService` implementado; `IptvOrgService` y `RestCountriesService` siguen como placeholders.
+- `app/Services/` — `RadioBrowserService` e `IptvOrgService` implementados; `RestCountriesService` sigue como placeholder.
 - `config/cors.php` — CORS habilitado para `api/*`.
 - `bootstrap/app.php` — registra solo las rutas de API y el health check nativo en `/up`.
 - `tests/Feature/ExampleTest.php` — comprueba que `/up` responde 200.
