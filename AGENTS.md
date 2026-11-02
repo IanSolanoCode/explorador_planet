@@ -49,3 +49,4 @@ Cada subproyecto tiene su propio `AGENTS.md` con el stack y las particularidades
 - Mantener la api como única puerta de entrada a datos externos.
 - Documentar en `PROGRESS.md` cualquier decisión de arquitectura o problema abierto relevante.
 - La documentación y los comentarios del proyecto se escriben en español.
+- **Comentar el código nuevo o modificado**: explicar intención, seguridad e invariantes; evitar comentarios que repitan lo que ya dice el código.

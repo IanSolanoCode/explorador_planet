@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-11-01
+Última actualización: 2026-11-02
 
 ## Hecho
 
@@ -63,15 +63,29 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Pruebas con curl: registro `201`, `role=admin` `422`, email duplicado `422`, contraseña débil `422`, login `200`, contraseña incorrecta `422`, intentos 1-5 `422` y el sexto `429`, `/me` con token `200`, `/me` sin token `401`, ruta inexistente `404` JSON, logout `204` y `/me` con token revocado `401`.
 - Verificación en MySQL del usuario de prueba: `role=user`, email almacenado en minúsculas, contraseña bcrypt (no texto plano), `password_check=true` y token con `expires_at=2026-12-01 05:07:07` (~30 días).
 - Limpieza final: 1 usuario de prueba eliminado, 0 usuarios y 0 tokens de prueba restantes.
+- **Comentarios**: el código de las etapas 1-3 quedó comentado en español (auth, modelos, migraciones, limitadores, rutas y bootstrap). La convención queda registrada en `AGENTS.md`.
+- **Etapa 4 completada**: `config/admin.php` lee `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`; `.env.example` incluye las tres variables vacías.
+- Comando `admin:create`: comprueba que las variables existan, valida email y contraseña (mínimo 8, mayúsculas, minúsculas y números), crea el usuario o actualiza el existente por email, asigna `role=admin` y nunca imprime la contraseña.
+- Middleware `admin` (`EnsureUserIsAdmin`) registrado como alias en `bootstrap/app.php`; si el usuario autenticado no es admin responde `403` JSON con `{"message":"Solo administradores."}`.
+- `phpunit.xml` ya no usa SQLite. En la etapa 4b se fijó `DB_CONNECTION=mysql` y `DB_DATABASE=explorador_planet_test`; el resto de credenciales sale de `.env`. `AdminMiddlewareTest` usa `DatabaseTransactions` y define una ruta temporal dentro del test, sin añadir rutas de prueba a `routes/api.php`.
+- `php artisan test`: 5 tests y 8 aserciones aprobadas en la etapa 4. En 4b la suite quedó en 6 tests y 9 aserciones, incluida una comprobación de que la base activa es `explorador_planet_test`.
+- Prueba con curl de la etapa 4: `admin:create` creó y luego actualizó `admin@example.com`; login `200`; `/api/auth/me` devolvió `role=admin`; el registro público con `role=admin` siguió devolviendo `422`. Ese usuario de prueba se eliminó en 4b.
+- Verificación MySQL de la etapa 4: `id=5`, `role=admin`, `password_plaintext=false`, `password_algo=bcrypt`, `password_hash_length=60`, `password_check=true`, `users_total=1` (usuario de prueba ya eliminado).
+- El `.env` local conserva temporalmente `ADMIN_PASSWORD`; debe eliminarse después de crear el administrador real.
+- **Etapa 4b completada**: se ejecutó `php artisan admin:create` con los datos reales del `.env` y se creó el administrador real (email distinto de `example.com`). El primer intento falló porque la contraseña no cumplía mayúsculas/minúsculas; se corrigió en `.env` y el segundo intento fue correcto.
+- Se eliminó `admin@example.com` y sus 2 tokens. Verificación final en MySQL: `admin_count=1`, `admin_example_count=0`, `users_total=1`; el único admin tiene `role=admin` y email real del `.env`.
+- Los tests se aislaron en MySQL `explorador_planet_test`: se creó la base, se aplicaron 7 migraciones (`migrate_exit=0`) y `php artisan test` pasó con 6 tests y 9 aserciones.
+- La cuenta de usuarios de `explorador_planet_db` se mantuvo en 1 antes y después de las migraciones y tests; la suite no tocó producción.
+- Se añadió a `AdminMiddlewareTest` la comprobación `DB::connection()->getDatabaseName() === 'explorador_planet_test'`.
+- Los scripts temporales de creación/migración/verificación se eliminaron después de usarlos.
 
 ## En curso
 
 - Servidor de desarrollo `php artisan serve` activo en http://127.0.0.1:8000 (health check en `/up`).
-- Etapas 1, 2 y 3 completadas. Detenido a la espera de aprobación para empezar la etapa 4 (administración).
+- Etapas 1, 2, 3, 4 y 4b completadas. Detenido antes de empezar la etapa 5 (favoritos).
 
 ## Pendiente
 
-- **Etapa 4**: comando `admin:create`, `config/admin.php` y middleware de administrador.
 - **Etapa 5**: endpoints de favoritos, límite de 200, duplicados y rechazo de items bloqueados.
 - **Etapa 6**: endpoints de administración de bloqueos.
 - **Etapa 7**: filtrado posterior a la caché en `TvController`, `RadioController`, `/tv/adult` y favoritos.
@@ -130,6 +144,13 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Los rate limits se registran como limitadores nombrados: `login` 5/min por email + IP y `register` 5/min por IP. El sexto intento devuelve `429` JSON.
 - Todos los errores de `/api/*` se renderizan como JSON. `bootstrap/app.php` anula la redirección de invitados y `shouldRenderJsonWhen` cubre `401`, `404`, `429` y el resto de errores de la API.
 - `UserResource` es la única representación pública del usuario y expone solo `id`, `name`, `email` y `role`.
+- Las credenciales del administrador inicial viven solo en `config/admin.php` leyendo `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`; no hay valores por defecto.
+- `admin:create` es idempotente: si el email existe actualiza nombre, contraseña y rol; si no, crea el usuario. El rol se asigna directamente porque no es fillable, y el comando nunca imprime la contraseña.
+- El middleware `admin` se registra como alias en `bootstrap/app.php` y se usa después de `auth:sanctum`; un usuario autenticado sin rol admin recibe `403` con `{"message":"Solo administradores."}`.
+- `phpunit.xml` usa MySQL con `DB_DATABASE=explorador_planet_test`; las demás credenciales salen de `.env`. Los tests que tocan la base usan `DatabaseTransactions` y una comprobación explícita de que la base activa es la de test.
+- El test del middleware define su ruta temporal dentro del test; `routes/api.php` no contiene rutas de prueba.
+- `.env.example` incluye `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` vacías. `ADMIN_PASSWORD` no debe conservarse en el `.env` local después de crear el administrador.
+- Todo el código nuevo o modificado lleva comentarios en español sobre intención, seguridad e invariantes; la regla está en `AGENTS.md`.
 - El JSON nuevo usará `camelCase` para mantener consistencia con TV y radio: `itemId`, `streamUrl`, `blockedBy`, `createdAt`. En la base se usan columnas `snake_case`.
 - En favoritos, `streamUrl` y `logo` solo aceptarán esquemas `http` y `https`; la validación se implementará en la etapa 5.
 - Los DELETE de favoritos y bloqueos usan el `id` numérico; si el recurso no pertenece al usuario, se responde `404`.
@@ -141,6 +162,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 ### Problemas abiertos
 
 - La conexión MySQL funciona y las migraciones están ejecutadas en `explorador_planet_db`; las credenciales están en `api/.env`.
+- El `.env` local conserva `ADMIN_PASSWORD`; el administrador real ya fue creado en la etapa 4b, así que debe eliminarse de `.env`.
 - La extensión PHP `intl` no está instalada: `php artisan db:show` falla al formatear la lista de tablas. `migrate` y `php artisan db:table --json` funcionan; no afecta a la base.
 - En local `APP_DEBUG=true` añade trazas a los JSON de `404` y `429`; el cuerpo sigue siendo JSON, pero en producción debe desactivarse para no exponer detalles internos.
 - El mock de atlas usa URLs ficticias; todavía no hay fuente real de atlas.

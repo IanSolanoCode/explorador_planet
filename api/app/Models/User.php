@@ -12,6 +12,12 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
+/**
+ * Usuario de la aplicación.
+ *
+ * role queda fuera de Fillable a propósito: solo se asigna desde la
+ * administración. Los tokens Bearer pertenecen a Sanctum.
+ */
 #[Fillable(['name', 'email', 'password'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
@@ -20,7 +26,7 @@ class User extends Authenticatable
     use HasApiTokens, HasFactory, Notifiable;
 
     /**
-     * Get the attributes that should be cast.
+     * Atributos que deben convertirse a tipos nativos.
      *
      * @return array<string, string>
      */
@@ -28,16 +34,22 @@ class User extends Authenticatable
     {
         return [
             'email_verified_at' => 'datetime',
+            // Laravel hashea la contraseña al asignarla; nunca se guarda en texto plano.
             'password' => 'hashed',
         ];
     }
 
+    /**
+     * Indica si el usuario tiene permisos de administración.
+     */
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
     }
 
     /**
+     * Favoritos creados por el usuario.
+     *
      * @return HasMany<Favorite, $this>
      */
     public function favorites(): HasMany
@@ -46,6 +58,8 @@ class User extends Authenticatable
     }
 
     /**
+     * Items bloqueados por este administrador.
+     *
      * @return HasMany<BlockedItem, $this>
      */
     public function blockedItems(): HasMany
