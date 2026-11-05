@@ -2,16 +2,17 @@
 
 use App\Http\Controllers\AtlasController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\RadioController;
 use App\Http\Controllers\TvController;
 use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Autenticación
+| Autenticación y favoritos del usuario
 |--------------------------------------------------------------------------
-| Registro y login son públicos. Logout y /me requieren un token Bearer.
-| Los límites de peticiones se definen en AppServiceProvider.
+| Registro y login son públicos. Logout, /me y la gestión de favoritos
+| requieren un token Bearer emitido por Sanctum.
 */
 
 Route::post('/auth/register', [AuthController::class, 'register'])->middleware('throttle:register');
@@ -20,6 +21,10 @@ Route::post('/auth/login', [AuthController::class, 'login'])->middleware('thrott
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     Route::get('/auth/me', [AuthController::class, 'me']);
+
+    Route::get('/favorites', [FavoriteController::class, 'index']);
+    Route::post('/favorites', [FavoriteController::class, 'store']);
+    Route::delete('/favorites/{id}', [FavoriteController::class, 'destroy'])->whereNumber('id');
 });
 
 /*
