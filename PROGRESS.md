@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-11-02
+Última actualización: 2026-11-06
 
 ## Hecho
 
@@ -78,16 +78,24 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - La cuenta de usuarios de `explorador_planet_db` se mantuvo en 1 antes y después de las migraciones y tests; la suite no tocó producción.
 - Se añadió a `AdminMiddlewareTest` la comprobación `DB::connection()->getDatabaseName() === 'explorador_planet_test'`.
 - Los scripts temporales de creación/migración/verificación se eliminaron después de usarlos.
+- **Etapa 5 completada**: endpoints `GET`, `POST` y `DELETE /api/favorites` con `auth:sanctum`; listado del usuario autenticado, más recientes primero, ocultando los `(type, itemId)` presentes en `blocked_items`.
+- `FavoriteController` crea favoritos mediante la relación del usuario autenticado, nunca acepta `user_id` del body y responde `201`; `DELETE` responde `204` y usa el mismo `404` para favorito ajeno o inexistente.
+- `StoreFavoriteRequest` valida `type` tv/radio, `itemId`/`name` de máximo 255, `country` de 2 letras normalizado a mayúsculas y `streamUrl`/`logo` solo con esquemas `http`/`https`; rechaza con `422` duplicados, límite de 200 e items bloqueados.
+- `FavoriteResource` expone `id`, `type`, `itemId`, `name`, `country`, `streamUrl` y `logo`.
+- `FavoriteTest` cubre alta, listado, duplicado, límite de 200, `javascript:`, item bloqueado, favorito oculto, borrado propio, borrado ajeno/inexistente y 401. La suite quedó en 17 tests.
+- **Etapa 6 completada**: endpoints `GET`, `POST` y `DELETE /api/admin/blocked` bajo `auth:sanctum` + `admin`, con `whereNumber('id')` en el borrado; listado más recientes primero, alta `201`, borrado `204` y `404` JSON para id inexistente.
+- `AdminBlockedItemController` asigna `blocked_by` desde el administrador autenticado mediante `blockedItems()`, nunca desde el body.
+- `StoreBlockedItemRequest` valida `type` tv/radio, `itemId` de máximo 255 y `reason` obligatorio de máximo 255; un duplicado de `(type, itemId)` responde `422` con mensaje en español.
+- `BlockedItemResource` expone `id`, `type`, `itemId`, `reason`, `blockedBy`, `createdAt` y `updatedAt` en camelCase; las fechas se serializan en ISO 8601.
+- `AdminBlockedItemTest` cubre 401 sin token, 403 con usuario normal, alta, listado, duplicado, type inválido, reason vacío, borrado y borrado inexistente. `php artisan test`: 27 tests y 111 aserciones aprobadas.
 
 ## En curso
 
 - Servidor de desarrollo `php artisan serve` activo en http://127.0.0.1:8000 (health check en `/up`).
-- Etapas 1, 2, 3, 4 y 4b completadas. Detenido antes de empezar la etapa 5 (favoritos).
+- Etapas 1, 2, 3, 4, 4b, 5 y 6 completadas. Detenido antes de empezar la etapa 7 (filtrado de bloqueos).
 
 ## Pendiente
 
-- **Etapa 5**: endpoints de favoritos, límite de 200, duplicados y rechazo de items bloqueados.
-- **Etapa 6**: endpoints de administración de bloqueos.
 - **Etapa 7**: filtrado posterior a la caché en `TvController`, `RadioController`, `/tv/adult` y favoritos.
 - **Etapa 8**: regresión con curl y actualización final de documentación.
 - Definir el stack concreto del front (librería 3D, framework de UI, build).
@@ -152,9 +160,13 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - `.env.example` incluye `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` vacías. `ADMIN_PASSWORD` no debe conservarse en el `.env` local después de crear el administrador.
 - Todo el código nuevo o modificado lleva comentarios en español sobre intención, seguridad e invariantes; la regla está en `AGENTS.md`.
 - El JSON nuevo usará `camelCase` para mantener consistencia con TV y radio: `itemId`, `streamUrl`, `blockedBy`, `createdAt`. En la base se usan columnas `snake_case`.
-- En favoritos, `streamUrl` y `logo` solo aceptarán esquemas `http` y `https`; la validación se implementará en la etapa 5.
+- En favoritos, `streamUrl` y `logo` solo aceptan esquemas `http` y `https`; la validación se implementó en la etapa 5.
 - Los DELETE de favoritos y bloqueos usan el `id` numérico; si el recurso no pertenece al usuario, se responde `404`.
 - Un favorito bloqueado se rechaza al crearlo con `422` y se oculta del listado. Los favoritos ocultos siguen contando para el límite de 200.
+- Los favoritos se listan con `latest('id')` y se ocultan con `whereNotExists` contra `blocked_items`; el registro oculto sigue existiendo en `favorites`.
+- `user_id` de un favorito y `blocked_by` de un bloqueo se asignan desde el usuario autenticado mediante relaciones; el body no puede sobrescribirlos.
+- Los bloqueos se listan con `latest('id')`; `BlockedItemResource` expone `blockedBy` como id del admin y las fechas en ISO 8601.
+- Las rutas `/api/admin/blocked` usan `auth:sanctum` + `admin`; el middleware responde 401/403 antes de llegar a la validación o al controlador.
 - El filtrado de bloqueos se hará después de leer la caché, en `TvController` y `RadioController`; si la base falla, TV y radio responden error y no sirven contenido sin comprobar bloqueos.
 - No se usará SQLite: la base de datos del proyecto es MySQL.
 - `symfony/mime` se actualizó a `v8.1.10` por el advisory CVE-2026-45070; no se desactivó la auditoría de Composer.
