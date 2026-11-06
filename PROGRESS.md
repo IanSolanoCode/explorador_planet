@@ -102,6 +102,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Suite completa tras la etapa 7: 34 tests y 140 aserciones aprobadas.
 - **Etapa 8 completada**: `php artisan test` pasó con 34 tests y 140 aserciones; `php artisan route:list` muestra 18 rutas y ninguna ruta de prueba. Las rutas ajenas a la aplicación son las de framework: `GET /up`, `GET /sanctum/csrf-cookie` y `GET/PUT /storage/{path}`.
 - `api/.env.example` y `api/AGENTS.md` quedaron revisados con las variables y los pasos de instalación desde cero, incluida la creación de `explorador_planet` y `explorador_planet_test` y la migración de la base de test.
+- **Documentación final**: `api/README.md` reescrito en español con puesta en marcha, comprobaciones, tests, endpoints, formatos de respuesta, funcionamiento interno, pendientes y problemas comunes; `README.md` de la raíz actualizado como presentación del proyecto.
 
 ## En curso
 
