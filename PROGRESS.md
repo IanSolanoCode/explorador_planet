@@ -6,6 +6,12 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
 ## Hecho
 
+- **Radio — hecho**: endpoints, integración con Radio Browser, caché de 6 h y filtro de bloqueos.
+- **TV — hecho**: endpoints regular y adulto, integración con iptv-org, caché de 6 h y filtro de bloqueos.
+- **Usuarios — hecho**: registro, login, logout, `/me`, Sanctum, expiración de tokens y rate limits.
+- **Favoritos — hecho**: alta, listado, borrado, límite de 200 y ocultación de bloqueados.
+- **Administrador — hecho**: `admin:create`, middleware `admin` y administrador real creado.
+- **Bloqueos — hecho**: CRUD administrativo, resource y filtrado en favoritos, TV y radio.
 - Estructura base de documentación del proyecto.
 - `README.md` con la descripción del proyecto.
 - `AGENTS.md` en la raíz con contexto, flujo de datos, estructura y reglas de trabajo.
@@ -94,23 +100,28 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - `BlockedContentFilterTest` simula iptv-org y Radio Browser con `Http::fake`, aísla la caché de archivo y cubre TV, TV adulto, radio, desbloqueo, bloqueo de radio que no afecta a TV, caché caliente y una sola consulta a `blocked_items`. Resultado: 7 tests y 29 aserciones.
 - Prueba real con curl sobre `/api/countries/MX/tv`: 172 canales antes, 171 con `15TV.mx` bloqueado y 172 tras desbloquear. Se usó un token temporal de admin, se eliminó el bloqueo y el token, y se retiraron los scripts temporales.
 - Suite completa tras la etapa 7: 34 tests y 140 aserciones aprobadas.
+- **Etapa 8 completada**: `php artisan test` pasó con 34 tests y 140 aserciones; `php artisan route:list` muestra 18 rutas y ninguna ruta de prueba. Las rutas ajenas a la aplicación son las de framework: `GET /up`, `GET /sanctum/csrf-cookie` y `GET/PUT /storage/{path}`.
+- `api/.env.example` y `api/AGENTS.md` quedaron revisados con las variables y los pasos de instalación desde cero, incluida la creación de `explorador_planet` y `explorador_planet_test` y la migración de la base de test.
 
 ## En curso
 
 - Servidor de desarrollo `php artisan serve` activo en http://127.0.0.1:8000 (health check en `/up`).
-- Etapas 1, 2, 3, 4, 4b, 5, 6 y 7 completadas. Detenido antes de empezar la etapa 8.
+- Etapas 1-8 completadas. Backend cerrado; el trabajo restante está en `Pendiente`.
 
 ## Pendiente
 
-- **Etapa 8**: regresión con curl y actualización final de documentación.
-- Definir el stack concreto del front (librería 3D, framework de UI, build).
-- Crear el esqueleto de `front/` con el globo 3D.
-- Implementar `RestCountriesService` y sustituir el mock de atlas (TV y radio ya usan datos reales).
-- Definir la estrategia de caché de atlas.
-- Definir el modelo de datos de países y la relación con las fuentes.
-- **Monetización de TV**: falta decidir cómo se monetizará el módulo de TV; la decisión sigue pendiente.
-- **Streams `http://` en frontend HTTPS**: en TV quedan 32 canales en MX, 16 en ES y 31 en CO con stream solo HTTP. Un front HTTPS los bloqueará por contenido mixto. Falta decidir entre excluirlos o proxearlos.
-- **Registrar reproducción con `/json/url/{uuid}`** (radio): al reproducir una emisora hay que llamar a Radio Browser para registrar el clic. Como el front no puede llamar a fuentes externas, falta definir un endpoint de la api y si el fallo debe ignorarse.
+- **Frontend**: construir el globo 3D y la interfaz en `front/`.
+- **Atlas con datos reales**: implementar `RestCountriesService` y sustituir los mocks.
+- **Verificación de streams caídos**: comprobar los `streamUrl` de TV y radio y descartar los que no respondan.
+- **Comando de precalentamiento de caché de TV**: precalcular la caché por país; la primera consulta de cada país tarda unos 6 s.
+- **Antes de publicar**:
+  - `APP_DEBUG=false`.
+  - CORS limitado al dominio del front.
+  - Ajustar la memoria de PHP: el pico de TV es 94 MiB.
+  - Resolver los streams `http://` en un front HTTPS.
+  - Implementar recuperación de contraseña.
+  - Publicar política de privacidad.
+  - Decidir la monetización de TV.
 
 ## Decisiones y problemas
 
@@ -179,18 +190,8 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
 ### Problemas abiertos
 
-- La conexión MySQL funciona y las migraciones están ejecutadas en `explorador_planet_db`; las credenciales están en `api/.env`.
-- El `.env` local conserva `ADMIN_PASSWORD`; el administrador real ya fue creado en la etapa 4b, así que debe eliminarse de `.env`.
+- El `.env` local puede conservar `ADMIN_PASSWORD`; si sigue ahí, debe eliminarse.
 - La extensión PHP `intl` no está instalada: `php artisan db:show` falla al formatear la lista de tablas. `migrate` y `php artisan db:table --json` funcionan; no afecta a la base.
-- En local `APP_DEBUG=true` añade trazas a los JSON de `404` y `429`; el cuerpo sigue siendo JSON, pero en producción debe desactivarse para no exponer detalles internos.
-- El mock de atlas usa URLs ficticias; todavía no hay fuente real de atlas.
-- Stack del globo 3D sin decidir.
-- La fuente de radio (Radio Browser) y la de TV (iptv-org) están integradas; queda por evaluar la fuente de atlas.
-- Cobertura de países del atlas sin definir.
-- Sin definir aún qué datos se muestran por país y por módulo.
-- Muchas emisoras de radio devuelven `streamUrl` HTTP, incompatible con un front HTTPS sin proxy o filtro. En TV ocurre lo mismo con 32 canales de MX, 16 de ES y 31 de CO.
-- La decisión de monetización del módulo de TV sigue pendiente.
 - iptv-org no expone `isOfficial`; no se puede filtrar por origen autorizado sin una lista blanca propia.
 - El endpoint `/tv/adult` está implementado, pero su utilidad práctica es casi nula con los datos actuales (2 canales NSFW con stream en todo el mundo).
 - No hay reintentos ante fallos de Radio Browser; la caché de 6 h y la rotación de servidores son la única mitigación.
-- El registro de reproducción de Radio Browser (`/json/url/{uuid}`) aún no está implementado.
