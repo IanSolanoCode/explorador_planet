@@ -88,15 +88,20 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - `StoreBlockedItemRequest` valida `type` tv/radio, `itemId` de máximo 255 y `reason` obligatorio de máximo 255; un duplicado de `(type, itemId)` responde `422` con mensaje en español.
 - `BlockedItemResource` expone `id`, `type`, `itemId`, `reason`, `blockedBy`, `createdAt` y `updatedAt` en camelCase; las fechas se serializan en ISO 8601.
 - `AdminBlockedItemTest` cubre 401 sin token, 403 con usuario normal, alta, listado, duplicado, type inválido, reason vacío, borrado y borrado inexistente. `php artisan test`: 27 tests y 111 aserciones aprobadas.
+- **Etapa 7 completada**: `BlockedItemFilter` (`app/Support/BlockedItemFilter.php`) elimina de una lista normalizada los ids presentes en `blocked_items` para un tipo dado, con una sola consulta `whereIn` por petición.
+- `TvController` aplica el filtro de tipo `tv` a `/tv` y `/tv/adult`; `RadioController` aplica el filtro de tipo `radio` sobre el id de la emisora. En ambos casos se ejecuta después de leer la caché y antes de construir el Resource.
+- No se modificaron `IptvOrgService`, `RadioBrowserService`, sus cachés, el formato JSON ni los códigos HTTP existentes. Si falla la consulta a `blocked_items`, la excepción se propaga y el endpoint responde error en lugar de servir contenido sin filtrar.
+- `BlockedContentFilterTest` simula iptv-org y Radio Browser con `Http::fake`, aísla la caché de archivo y cubre TV, TV adulto, radio, desbloqueo, bloqueo de radio que no afecta a TV, caché caliente y una sola consulta a `blocked_items`. Resultado: 7 tests y 29 aserciones.
+- Prueba real con curl sobre `/api/countries/MX/tv`: 172 canales antes, 171 con `15TV.mx` bloqueado y 172 tras desbloquear. Se usó un token temporal de admin, se eliminó el bloqueo y el token, y se retiraron los scripts temporales.
+- Suite completa tras la etapa 7: 34 tests y 140 aserciones aprobadas.
 
 ## En curso
 
 - Servidor de desarrollo `php artisan serve` activo en http://127.0.0.1:8000 (health check en `/up`).
-- Etapas 1, 2, 3, 4, 4b, 5 y 6 completadas. Detenido antes de empezar la etapa 7 (filtrado de bloqueos).
+- Etapas 1, 2, 3, 4, 4b, 5, 6 y 7 completadas. Detenido antes de empezar la etapa 8.
 
 ## Pendiente
 
-- **Etapa 7**: filtrado posterior a la caché en `TvController`, `RadioController`, `/tv/adult` y favoritos.
 - **Etapa 8**: regresión con curl y actualización final de documentación.
 - Definir el stack concreto del front (librería 3D, framework de UI, build).
 - Crear el esqueleto de `front/` con el globo 3D.
@@ -167,7 +172,8 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - `user_id` de un favorito y `blocked_by` de un bloqueo se asignan desde el usuario autenticado mediante relaciones; el body no puede sobrescribirlos.
 - Los bloqueos se listan con `latest('id')`; `BlockedItemResource` expone `blockedBy` como id del admin y las fechas en ISO 8601.
 - Las rutas `/api/admin/blocked` usan `auth:sanctum` + `admin`; el middleware responde 401/403 antes de llegar a la validación o al controlador.
-- El filtrado de bloqueos se hará después de leer la caché, en `TvController` y `RadioController`; si la base falla, TV y radio responden error y no sirven contenido sin comprobar bloqueos.
+- El filtrado de bloqueos se aplica después de leer la caché, en `TvController` y `RadioController`, mediante `BlockedItemFilter`; si la base falla, TV y radio responden error y no sirven contenido sin comprobar bloqueos.
+- `BlockedItemFilter` hace una sola consulta a `blocked_items` por petición (`type` + `whereIn` sobre los ids) y conserva el orden y el formato de la lista original.
 - No se usará SQLite: la base de datos del proyecto es MySQL.
 - `symfony/mime` se actualizó a `v8.1.10` por el advisory CVE-2026-45070; no se desactivó la auditoría de Composer.
 

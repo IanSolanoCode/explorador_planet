@@ -5,11 +5,15 @@ namespace App\Http\Controllers;
 use App\Exceptions\IptvOrgException;
 use App\Http\Resources\TvChannelResource;
 use App\Services\IptvOrgService;
+use App\Support\BlockedItemFilter;
 use Illuminate\Support\Facades\Log;
 
 class TvController extends Controller
 {
-    public function __construct(private readonly IptvOrgService $iptvOrg) {}
+    public function __construct(
+        private readonly IptvOrgService $iptvOrg,
+        private readonly BlockedItemFilter $blockedItemFilter,
+    ) {}
 
     public function __invoke(string $code)
     {
@@ -38,6 +42,9 @@ class TvController extends Controller
                 'error' => 'iptv_org_unavailable',
             ], 502);
         }
+
+        // Se filtra después de la caché para que los bloqueos nuevos apliquen al instante.
+        $channels = $this->blockedItemFilter->filter('tv', $channels);
 
         return TvChannelResource::collection($channels);
     }
