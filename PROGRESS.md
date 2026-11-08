@@ -232,7 +232,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
     4. Si no hay nada, devuelve vacío
   - ✅ Países clicables: al hacer clic, se muestra nombre y código ISO-2 en panel lateral
   - ✅ País sin código ISO muestra: "Este territorio no tiene código de país"
-  - ✅ Barra de pestañas "Radio" y "TV" - cambia el botón activo visualmente
+  - ✅ **Barra Radio/TV conectada**: pestañas arriba, carga de emisoras desde API, sección "Reproduciendo", detener audio
   - ✅ Variables de entorno: `VITE_API_URL` leída con `import.meta.env`, nunca escrita en código
   - ✅ `.env` y `.env.example` creados en `front/`
   - ✅ `front/.env` y `front/node_modules` en `.gitignore` (archivo raíz)
