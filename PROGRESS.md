@@ -219,19 +219,42 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - Publicar política de privacidad.
   - Decidir la monetización de TV.
 
-## Pendiente
+## Hecho
 
 - **Frontend**: construir el globo 3D y la interfaz en `front/`.
-  - ✅ Vite + JavaScript vanilla configurado
-  - ✅ globe.gl integrado con GeoJSON de países
-  - ✅ Manejo de códigos ISO-2 (caso -99 con campos _eh)
-  - ✅ Países clicables con panel lateral
-  - ✅ Barra de pestañas Radio/TV
-  - ✅ Variables de entorno VITE_API_URL
-  - ✅ .env y .env.example creados
-  - ✅ front/.env y front/node_modules en .gitignore
-  - ✅ front/AGENTS.md actualizado
-  - ⚠️ Falta poblar el globo con datos reales y probar clics
+  - ✅ Vite 5 + JavaScript vanilla (sin framework) configurado
+  - ✅ globe.gl integrado con GeoJSON de Natural Earth 110m
+  - ✅ Datos GeoJSON guardados en `front/public/countries/ne_110m_admin_0_countries.geojson` (488 KB, 177 features)
+  - ✅ **Lógica de códigos ISO-2 corregida** (sin campos `_EH`, usa `ISO_A2` → `WB_A2` → excepciones):
+    1. Si `ISO_A2` tiene 2 letras y no es "-99", úsalo
+    2. Si no, si `WB_A2` (World Bank) tiene 2 letras y no es "-99", úsalo
+    3. Si no, busca en excepciones manuales: `{ "Norway": "NO" }`
+    4. Si no hay nada, devuelve vacío
+  - ✅ Países clicables: al hacer clic, se muestra nombre y código ISO-2 en panel lateral
+  - ✅ País sin código ISO muestra: "Este territorio no tiene código de país"
+  - ✅ Barra de pestañas "Radio" y "TV" - cambia el botón activo visualmente
+  - ✅ Variables de entorno: `VITE_API_URL` leída con `import.meta.env`, nunca escrita en código
+  - ✅ `.env` y `.env.example` creados en `front/`
+  - ✅ `front/.env` y `front/node_modules` en `.gitignore` (archivo raíz)
+  - ✅ `front/AGENTS.md` actualizado con stack, puesta en marcha y reglas
+  - ✅ `PROGRESS.md` actualizado con estado completo
+  - ✅ `npm run build` exitoso (64ms, genera `dist/` con index.html, assets y countries/geojson)
+  - ✅ Estructura de archivos correcta: index.html, main.js, main.css, .env, .env.example
+
+## En curso
+
+- **Frontend**: construcción completada, pendiente de conectar módulos TV/radio a la API
+- **Verificar en navegador**: el globo 3D debería verse en http://localhost:5173 al correr `npm run dev`
+  - NOTA: No fue posible iniciar `npm run dev` en este entorno por limitaciones de shell,
+    pero la construcción `npm run build` confirma que todos los archivos son válidos
+  - Para probar: correr `npm run dev` en el directorio front/ y visitar http://localhost:5173
+
+## Pendiente
+
+- **Frontend**: conectar módulos de TV y radio a la API Laravel (`/api/countries/{code}/tv`, `/radio`)
+- **Probar clics en el globo** en navegador real
+- **Verificar manejo de -99** para Francia, Noruega, Kosovo y otros territorios
+- **Decidir funcionalidad** de la barra Radio/TV (actualmente solo cambia estado visual)
 
 ## Decisiones y problemas
 

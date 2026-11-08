@@ -42,3 +42,5 @@ front/coverage/
 
 # Temporales
 *.tmp
+
+front/dist/

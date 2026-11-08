@@ -1,187 +1,95 @@
-/**
- * Explorador Planet - Frontend
- * Módulo: Globo 3D interactivo con países clicables
- * 
- * Se usa globe.gl para el renderizado y fetch a la API local.
- * La URL de la API viene de VITE_API_URL en las variables de entorno.
- */
+import Globe from 'globe.gl';
 
-// Configuración: leer la URL de la API de las variables de entorno
+// Se usará cuando conectemos la pestaña Radio
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 
-// Cargar datos GeoJSON de países desde el dataset datasets/geo-countries
-// Este dataset usa: iso_a2 (2-letter), iso_a3 (3-letter), con campos _eh como alternativo para países con -99
-const COUNTRIES_GEOJSON_URL = 'https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson';
+// Países sin código válido en ISO_A2 ni en WB_A2
+const ISO2_EXCEPTIONS = { Norway: 'NO' };
 
-// Estado activo
-let currentCountry = null;
+const COLOR_BASE = 'rgba(66, 135, 245, 0.8)';
+const COLOR_SELECCION = 'rgba(255, 215, 0, 0.9)';
+
 let globe = null;
+let selectedFeature = null;
 
-// Mapeo para manejar códigos ISO -99 (Francia, Noruega usan campos _eh)
-const isoMap = {
-  // Los campos _eh contienen el código correcto cuando iso_a2/iso_a3 es -99
-  // Se aplicará el mapeo dinámicamente al procesar cada país
-};
-
-/**
- * Obtiene el código ISO-2 correcto para un país del GeoJSON.
- * Si iso_a2 es "-99", usa iso_a2_eh en su lugar.
- */
-function getIso2FromFeature(feature) {
-  const props = feature.properties;
-  if (props.iso_a2 && props.iso_a2 !== '-99') {
-    return props.iso_a2;
-  }
-  // Campo alternativo para países con -99
-  return props.iso_a2_eh || props.iso_a2 || '';
+function esCodigoValido(c) {
+  return typeof c === 'string' && c.length === 2 && c !== '-99';
 }
 
-/**
- * Inicializa el globe.gl con los países.
- */
+function getIso2(props) {
+  if (esCodigoValido(props.ISO_A2)) return props.ISO_A2;
+  if (esCodigoValido(props.WB_A2)) return props.WB_A2;
+  return ISO2_EXCEPTIONS[props.ADMIN] || '';
+}
+
+function getName(props) {
+  return props.ADMIN || 'País desconocido';
+}
+
+function aplicarEstilos() {
+  globe
+    .polygonCapColor((f) => (f === selectedFeature ? COLOR_SELECCION : COLOR_BASE))
+    .polygonAltitude((f) => (f === selectedFeature ? 0.08 : 0.01));
+}
+
+function actualizarPanel(props) {
+  const iso2 = getIso2(props);
+  const codigo = document.getElementById('country-code');
+
+  document.getElementById('country-name').textContent = getName(props);
+  if (iso2) {
+    codigo.textContent = `Código ISO-2: ${iso2}`;
+    codigo.style.color = '#e0e0e0';
+  } else {
+    codigo.textContent = 'Este territorio no tiene código de país';
+    codigo.style.color = '#ff9999';
+  }
+  document.getElementById('country-info').classList.remove('hidden');
+}
+
+function handleCountryClick(feature) {
+  selectedFeature = feature;
+  aplicarEstilos();
+  actualizarPanel(feature.properties);
+}
+
 async function initGlobe() {
-  // Cargar el GeoJSON de países
-  const response = await fetch(COUNTRIES_GEOJSON_URL);
-  const geojson = await response.json();
+  const res = await fetch('/countries/ne_110m_admin_0_countries.geojson');
+  if (!res.ok) throw new Error(`No se pudo cargar el mapa (HTTP ${res.status})`);
+  const { features } = await res.json();
 
-  // Inicializar globe.gl
-  globe = GLGlob('globe', {
-    // Configuración del globo
-   uiControl: false,
-    keyboardControl: false,
-    zoomSpeed: 0.001,
-    dragToRotate: true,
-    dragToTilt: true,
-  });
+  globe = Globe()(document.getElementById('globe'))
+    .backgroundColor('#0a0a0f')
+    .polygonsData(features)
+    .polygonSideColor(() => 'rgba(0, 100, 200, 0.3)')
+    .polygonStrokeColor(() => '#1a3a6e')
+    .polygonLabel((f) => {
+      const iso2 = getIso2(f.properties);
+      const nombre = getName(f.properties);
+      return iso2 ? `<b>${nombre}</b> (${iso2})` : `<b>${nombre}</b>`;
+    })
+    .onPolygonClick((f) => handleCountryClick(f));
 
-  // Añadir el relieve del terreno
-  globe.addLayer('layer-terrain', GLTerrain() );
-
-  // Añadir capa de países con click handling
-  const countriesLayer = globe.addLayer('countries', GLSphereLayer, {
-    mode: 'vector',
-    polygon: true,
-    // Usar el código ISO-2 como etiqueta/identificador
-    getPolygon: (feature) => feature.geometry,
-    getColor: (feature) => {
-      // Color base de los países
-      return [66, 135, 245, 0.8];
-    },
-    // Hover effect
-    onHover: (feature, info) => {
-      const iso2 = getIso2FromFeature(feature);
-      // Podríamos resaltar aquí, pero usaremos el click para resaltar
-    },
-    onClick: async (feature, event) => {
-      handleCountryClick(feature);
-    },
-  });
-
-  // Añadir todas las features de países
-  countriesLayer.setFeatures(geojson.features);
-  
-  // Ajustar la cámara para ver todo el globo
-  globe.cameraControl.setState({
-    lon: 0,
-    lat: 0,
-    zoom: 0.5,
-  });
+  aplicarEstilos();
+  globe.controls().autoRotate = true;
+  globe.controls().autoRotateSpeed = 0.5;
 }
 
-/**
- * Maneja el clic en un país.
- * - Resalta el país
- * - Muestra el nombre y código ISO en el panel lateral
- * - Carga datos de la API correspondiente
- */
-async function handleCountryClick(feature) {
-  const iso2 = getIso2FromFeature(feature).toUpperCase();
-  const name = feature.properties.name || 'País desconocido';
-
-  // Actualizar estado y UI
-  currentCountry = iso2;
-  updateCountrySidebar(iso2, name);
-
-  // Resaltar el país clicado (cambiar color)
-  if (globe) {
-    globe.layers.forEach(layer => {
-      if (layer.type === 'GLSphereLayer' && layer.props && layer.props.mode === 'vector') {
-        // Marcar este país como activo - globe.gl no tiene fácil toggle por feature,
-        // así que solo registramos el estado
-        layer.activateFeature(feature);
-      }
-    });
-  }
-
-  // Cargar datos de la API (atlas, radio, tv) - pero NO conectar todavía
-  // En el futuro: fetch(`${API_BASE}/countries/${iso2}/atlas`)
-  console.log(`País seleccionado: ${iso2} - ${name}`);
-}
-
-/**
- * Actualiza el panel lateral con la información del país.
- */
-function updateCountrySidebar(iso2, name) {
-  const sidebar = document.getElementById('country-info');
-  const countryName = document.getElementById('country-name');
-  const countryCode = document.getElementById('country-code');
-
-  countryName.textContent = name;
-  countryCode.textContent = `Código ISO-2: ${iso2}`;
-  sidebar.classList.remove('hidden');
-}
-
-/**
- * Cambia la pestaña activa en la barra de navegación.
- */
 function setupToolbar() {
-  const tabBtns = document.querySelectorAll('.tab-btn');
-
-  tabBtns.forEach(btn => {
+  const botones = document.querySelectorAll('.tab-btn');
+  botones.forEach((btn) => {
     btn.addEventListener('click', () => {
-      // Actualizar clase active
-      tabBtns.forEach(b => b.classList.remove('active'));
+      botones.forEach((b) => b.classList.remove('active'));
       btn.classList.add('active');
-
-      // Aquí más adelante se cargaría el módulo correspondiente
-      const tab = btn.dataset.tab;
-      console.log(`Modo cambiado a: ${tab}`);
     });
   });
 }
 
-/**
- * Oculta el panel lateral cuando se hace clic fuera.
- */
-function setupSidebarToggle() {
-  const sidebar = document.getElementById('sidebar');
-  const globeDiv = document.getElementById('globe');
-
-  globeDiv.addEventListener('click', (event) => {
-    // Verificar si el clic fue en el área del globo (no en el sidebar)
-    const rect = sidebar.getBoundingClientRect();
-    if (event.clientX < rect.left || event.clientX > rect.right || 
-        event.clientY < rect.top || event.clientY > rect.bottom) {
-      sidebar.classList.add('hidden');
-    }
-  });
-}
-
-/**
- * Inicializa la aplicación.
- */
 async function init() {
   await initGlobe();
   setupToolbar();
-  setupSidebarToggle();
-
-  // Verificar que la variable de entorno esté configurada
-  if (!import.meta.env.VITE_API_URL) {
-    console.warn('VITE_API_URL no está configurada. Usando URL por defecto.');
-    console.log('Para configurar: VITE_API_URL=http://127.0.0.1:8000/api');
-  }
 }
 
-init().catch(err => {
+init().catch((err) => {
   console.error('Error inicializando la aplicación:', err);
 });

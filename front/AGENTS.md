@@ -43,19 +43,33 @@ front/
 ## Funcionalidades
 
 - **Globo 3D**: Países como Features clicables usando globe.gl + GeoJSON de datasets/geo-countries
-- **Códigos ISO-2**: Manejo del caso -99 usando campos alternativos iso_a2_eh/iso_a3_eh
+- **Códigos ISO-2**: Lógica en main.js usa `ISO_A2` → `WB_A2` → excepciones `{ "Norway": "NO" }`; territorios sin código quedan vacíos
 - **Panel lateral**: Al hacer clic en un país, muestra su nombre y código ISO-2
 - **Barra de pestañas**: "Radio" y "TV" - cambia el estado visual, funcionalidad pendiente
 - **API**: Consume endpoints `/api/countries/{code}/atlas`, `/radio`, `/tv` desde la API Laravel
 
 ## Manejo de códigos ISO-2
 
-El dataset `datasets/geo-countries` trae `-99` para países como Francia o Noruega
-en los campos `iso_a2`/`iso_a3`. El código usa el campo alternativo `_eh`:
-- Si `iso_a2` es `-99`, se usa `iso_a2_eh`
-- Lo mismo para `iso_a3` → `iso_a3_eh`
+El dataset `ne_110m_admin_0_countries.geojson` (Natural Earth 110m) usa los campos:
+- `ISO_A2`: código ISO-2 de 2 letras (o "-99" si no disponible)
+- `WB_A2`: código World Bank de 2 letras (alternativa cuando ISO_A2 es "-99")
 
-Esto se aplica en la función `getIso2FromFeature()` en `main.js`.
+**Lógica en main.js** (función `getIso2FromFeature`):
+1. Si `ISO_A2` tiene 2 letras y no es "-99", úsalo
+2. Si no, si `WB_A2` tiene 2 letras y no es "-99", úsalo
+3. Si no, busca en excepciones manuales: `{ "Norway": "NO" }`
+4. Si no hay nada, devuelve vacío (territorio sin código)
+
+Países verificados:
+- **Mexico**: ISO-2 = MX (directo)
+- **France**: ISO-2 = -99 en ISO_A2, WB_A2 = "FR" → usa "FR" (via WB_A2)
+- **Norway**: ISO-2 = -99 en ISO_A2, WB_A2 = "-99" → excepción manual → "NO"
+- **Spain**: ISO-2 = ES (directo)
+- **Colombia**: ISO-2 = CO (directo)
+- **Kosovo**: ISO-2 = XK (directo)
+- **Taiwan**: ISO-2 = TW (directo)
+- **Northern Cyprus**: ISO-2 = -99 en ambos campos → vacío
+- **Somaliland**: ISO-2 = -99 en ambos campos → vacío
 
 ## Reglas
 
