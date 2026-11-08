@@ -36,6 +36,8 @@ api/bootstrap/cache/*
 
 # Front (front/)
 front/.cache/
+front/.env
+front/node_modules/
 front/coverage/
 
 # Temporales

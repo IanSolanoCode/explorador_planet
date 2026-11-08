@@ -109,7 +109,102 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Servidor de desarrollo `php artisan serve` activo en http://127.0.0.1:8000 (health check en `/up`).
 - Etapas 1-8 completadas. Backend cerrado; el trabajo restante está en `Pendiente`.
 
-## Pendiente
+## Hecho
+
+- **Radio — hecho**: endpoints, integración con Radio Browser, caché de 6 h y filtro de bloqueos.
+- **TV — hecho**: endpoints regular y adulto, integración con iptv-org, caché de 6 h y filtro de bloqueos.
+- **Usuarios — hecho**: registro, login, logout, `/me`, Sanctum, expiración de tokens y rate limits.
+- **Favoritos — hecho**: alta, listado, borrado, límite de 200 y ocultación de bloqueados.
+- **Administrador — hecho**: `admin:create`, middleware `admin` y administrador real creado.
+- **Bloqueos — hecho**: CRUD administrativo, resource y filtrado en favoritos, TV y radio.
+- Estructura base de documentación del proyecto.
+- `README.md` con la descripción del proyecto.
+- `AGENTS.md` en la raíz con contexto, flujo de datos, estructura y reglas de trabajo.
+- `AGENTS.md` locales en `api/` y `front/`.
+- `.gitignore` inicial para el entorno Laravel + front.
+- Proyecto Laravel 13.39 limpio instalado en `api/` (PHP 8.4), en modo API: solo `routes/api.php`, sin rutas web, vistas ni assets de frontend.
+- `api/.env.example` configurado para MySQL (base `explorador_planet`). Sin migraciones ejecutadas ni tablas propias.
+- Servidor de desarrollo levantado con `php artisan serve`; `/up` responde 200.
+- Endpoints de ejemplo: `GET /api/countries/{code}/atlas`, `/radio` y `/tv`.
+- Un controlador por módulo (`AtlasController`, `RadioController`, `TvController`); TV y radio usan datos reales y atlas conserva mocks.
+- API Resources: `CountryResource`, `RadioStationResource`, `TvChannelResource`.
+- Services: `RadioBrowserService` e `IptvOrgService` implementados; `RestCountriesService` sigue vacío.
+- CORS habilitado en `config/cors.php` para `api/*`.
+- Validación de `{code}`: exactamente 2 letras; si no, `422` con mensaje claro en español.
+- Pruebas con curl de los tres endpoints (MX, códigos inválidos y atlas sin datos).
+- Módulo de radio conectado a Radio Browser: `RadioBrowserService` consulta `/json/stations/bycountrycodeexact/{code}` con `hidebroken=true`, `order=votes`, `reverse=true` y `limit=50`.
+- `RadioBrowserService` usa un User-Agent propio, timeout de conexión y respuesta de 5 s, y rotación de servidores (descubrimiento por DNS de `all.api.radio-browser.info` y respaldo `de1`/`de2`, en orden aleatorio).
+- Normalización de emisoras: `stationuuid`→`id`, `name` con `trim`, `countrycode`→`country`, `url_resolved`→`streamUrl`, `favicon`→`logo` y `tags` separadas por coma, sin duplicados y con máximo de 5.
+- Caché de radio de 6 horas por país en el store `file`, con clave `radio-browser:stations:{CODE}`. También se cachea el resultado vacío para no repetir consultas.
+- `RadioController` ya no usa mocks: si todos los servidores fallan responde `502` con `message` y `error: radio_browser_unavailable`; si el país no tiene emisoras responde `200` con `data: []`.
+- Mocks de radio eliminados; los mocks de atlas siguen intactos.
+- Pruebas con curl del módulo de radio: PE y CO devuelven 50 emisoras; BV, TK y ZZ devuelven `200` con `data: []`; MEX y 1 devuelven `422`; fallo simulado de todos los servidores devuelve `502` y la recuperación posterior vuelve a `200`. Caché verificada con expiración de ~6 h y TV/atlas sin cambios.
+- Módulo de TV conectado a iptv-org: `IptvOrgService` descarga `channels.json`, `streams.json`, `blocklist.json` y `logos.json` con timeout de 30 s, procesando un archivo cada vez y liberando cada array con `unset` antes de cargar el siguiente.
+- Filtros de TV: excluye canales cerrados (`closed`), canales del blocklist, streams con `referrer` o `user_agent`, y separa adultos. Prefiere HTTPS sin descartar HTTP y elige el mejor stream por calidad.
+- TV normalizada al contrato con `id`, `name`, `country`, `streamUrl`, `logo`, `category`, `source` (`iptv-org`) y `secure` (booleano según HTTPS).
+- Logos tomados de `logos.json`: se prefiere `in_use: true`, `feed: null` y mayor área.
+- Categoría: primera distinta de `general`; si todas son `general`, se usa `general`.
+- Endpoint `/api/countries/{code}/tv` devuelve solo canales no adultos; `/api/countries/{code}/tv/adult` devuelve los adultos. Ambos comparten contrato.
+- Caché de TV de 6 h por país en el store `file`, con claves `iptv:tv:{CODE}` e `iptv:tv:adult:{CODE}`. Los fallos no se cachean.
+- Si falla la descarga de iptv-org, la API responde `502` con `message` y `error: iptv_org_unavailable`.
+- Pruebas de TV: MX 172 canales, ES 216, CO 122, ZZ vacío, MEX `422` y MX adulto vacío. Primera llamada a MX 13,61 s y segunda 0,33 s (caché).
+- Pico de memoria medido al construir la lista de TV: `98.566.144` bytes (94,0 MiB) con `memory_get_peak_usage(true)`.
+- Fallo simulado de descarga de iptv-org: la API responde `502` con `iptv_org_unavailable` y no deja nada en caché.
+- Tres streams HTTPS de MX verificados con `curl -I`: 8NTV (200), AcustikTV (200) y AlcanceTV (200); 15TV falló con HTTP 000 y se descartó de la muestra.
+- **Etapa 1 completada**: Sanctum `v4.3.3` instalado con Composer; `HasApiTokens` añadido a `User`.
+- `symfony/mime` actualizado de `v8.1.7` a `v8.1.10` (y `symfony/polyfill-mbstring` de `v1.43.0` a `v1.43.3`) para corregir el advisory CVE-2026-45070. `composer audit` ya no reporta vulnerabilidades.
+- `config/sanctum.php` publicado con `expiration = 43200` minutos (30 días). La expiración se aplica al autenticar; en la etapa 3 los tokens se crearán además con `expires_at` explícito a 30 días.
+- CORS actualizado a `GET, POST, DELETE, OPTIONS` para `api/*`.
+- **Etapa 2 completada**: migraciones `add_role_to_users_table`, `create_favorites_table`, `create_blocked_items_table` y `create_personal_access_tokens_table`.
+- Modelos `Favorite` y `BlockedItem`; `User` con `isAdmin()`, `favorites()` y `blockedItems()`.
+- `role` es `varchar(16)` con valor por defecto `user`; sigue fuera de `$fillable` para impedir asignación masiva.
+- `favorites` tiene FK `user_id` con `cascadeOnDelete` y único `(user_id, type, item_id)`.
+- `blocked_items` tiene FK nullable `blocked_by` con `set null` y único `(type, item_id)`.
+- `Favorite::MAX_PER_USER = 200`.
+- Migraciones ejecutadas en MySQL (`explorador_planet_db`): usuarios, cache, jobs, tokens, rol, favoritos y bloqueos.
+- Verificación transaccional: el rol por defecto es `user`; un token de prueba nace con `expires_at` a 30 días; tras el rollback no quedaron usuarios de prueba.
+- **Etapa 3 completada**: endpoints `POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout` y `GET /api/auth/me`.
+- `RegisterRequest` valida nombre, email único y contraseña de mínimo 8 caracteres con mayúsculas, minúsculas, números y confirmación; rechaza cualquier presencia de `role` con `422`.
+- `LoginRequest` normaliza el email; las credenciales incorrectas devuelven `422` con el mensaje genérico `Credenciales incorrectas.`, sin revelar si el email existe.
+- Los emails se normalizan a minúsculas en `prepareForValidation()` de ambos FormRequests.
+- Rate limits nombrados en `AppServiceProvider`: `login` 5/min por email + IP y `register` 5/min por IP; al excederse responden `429` en JSON.
+- `AuthController` crea cada token con `expires_at` explícito de 30 días; `logout` revoca solo el token actual y responde `204`; `me` devuelve el usuario autenticado.
+- `UserResource` expone únicamente `id`, `name`, `email` y `role`; nunca `password` ni tokens.
+- `bootstrap/app.php` anula la redirección de invitados a `route('login')`, de modo que un `/api/*` sin token responde `401` JSON en lugar de `500`.
+- Pruebas con curl: registro `201`, `role=admin` `422`, email duplicado `422`, contraseña débil `422`, login `200`, contraseña incorrecta `422`, intentos 1-5 `422` y el sexto `429`, `/me` con token `200`, `/me` sin token `401`, ruta inexistente `404` JSON, logout `204` y `/me` con token revocado `401`.
+- Verificación en MySQL del usuario de prueba: `role=user`, email almacenado en minúsculas, contraseña bcrypt (no texto plano), `password_check=true` y token con `expires_at=2026-12-01 05:07:07` (~30 días).
+- **Limpieza final**: 1 usuario de prueba eliminado, 0 usuarios y 0 tokens de prueba restantes.
+- **Etapa 4 completada**: `config/admin.php` lee `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`; `.env.example` incluye las tres variables vacías.
+- Comando `admin:create`: comprueba que las variables existan, valida email y contraseña (mínimo 8, mayúsculas, minúsculas y números), crea el usuario o actualiza el existente por email, asigna `role=admin` y nunca imprime la contraseña.
+- Middleware `admin` (`EnsureUserIsAdmin`) registrado como alias en `bootstrap/app.php`; si el usuario autenticado no es admin responde `403` JSON con `{"message":"Solo administradores."}`.
+- `phpunit.xml` ya no usa SQLite. En la etapa 4b se fijó `DB_CONNECTION=mysql` y `DB_DATABASE=explorador_planet_test`; el resto de credenciales sale de `.env`. `AdminMiddlewareTest` usa `DatabaseTransactions` y define una ruta temporal dentro del test, sin añadir rutas de prueba a `routes/api.php`.
+- `php artisan test`: 5 tests y 8 aserciones aprobadas en la etapa 4. En 4b la suite quedó en 6 tests y 9 aserciones, incluida una comprobación de que la base activa es `explorador_planet_test`.
+- Prueba con curl de la etapa 4: `admin:create` creó y luego actualizó `admin@example.com`; login `200`; `/api/auth/me` devolvió `role=admin`; el registro público con `role=admin` siguió devolviendo `422`. Ese usuario de prueba se eliminó en 4b.
+- Verificación MySQL de la etapa 4: `id=5`, `role=admin`, `password_plaintext=false`, `password_algo=bcrypt`, `password_hash_length=60`, `password_check=true`, `users_total=1` (usuario de prueba ya eliminado).
+- **Etapa 4b completada**: se ejecutó `php artisan admin:create` con los datos reales del `.env` y se creó el administrador real (email distinto de `example.com`). El primer intento falló porque la contraseña no cumplía mayúsculas/minúsculas; se corrigió en `.env` y el segundo intento fue correcto.
+- Se eliminó `admin@example.com` y sus 2 tokens. Verificación final en MySQL: `admin_count=1`, `admin_example_count=0`, `users_total=1`; el único admin tiene `role=admin` y email real del `.env`.
+- Los scripts temporales de creación/migración/verificación se eliminaron después de usarlos.
+- **Etapa 5 completada**: endpoints `GET`, `POST` y `DELETE /api/favorites` con `auth:sanctum`; listado del usuario autenticado, más recientes primero, ocultando los `(type, itemId)` presentes en `blocked_items`.
+- `FavoriteController` crea favoritos mediante la relación del usuario autenticado, nunca acepta `user_id` del body y responde `201`; `DELETE` responde `204` y usa el mismo `404` para favorito ajeno o inexistente.
+- `StoreFavoriteRequest` valida `type` tv/radio, `itemId`/`name` de máximo 255, `country` de 2 letras normalizado a mayúsculas y `streamUrl`/`logo` solo con esquemas `http`/`https`; rechaza con `422` duplicados, límite de 200 e items bloqueados.
+- `FavoriteResource` expone `id`, `type`, `itemId`, `name`, `country`, `streamUrl` y `logo`.
+- `FavoriteTest` cubre alta, listado, duplicado, límite de 200, `javascript:`, item bloqueado, favorito oculto, borrado propio, borrado ajeno/inexistente y 401. La suite quedó en 17 tests.
+- **Etapa 6 completada**: endpoints `GET`, `POST` y `DELETE /api/admin/blocked` bajo `auth:sanctum` + `admin`, con `whereNumber('id')` en el borrado; listado más recientes primero, alta `201`, borrado `204` y `404` JSON para id inexistente.
+- `AdminBlockedItemController` asigna `blocked_by` desde el administrador autenticado mediante `blockedItems()`, nunca desde el body.
+- `StoreBlockedItemRequest` valida `type` tv/radio, `itemId` de máximo 255 y `reason` obligatorio de máximo 255; un duplicado de `(type, itemId)` responde `422` con mensaje en español.
+- `BlockedItemResource` expone `id`, `type`, `itemId`, `reason`, `blockedBy`, `createdAt` y `updatedAt` en camelCase; las fechas se serializan en ISO 8601.
+- `AdminBlockedItemTest` cubre 401 sin token, 403 con usuario normal, alta, listado, duplicado, type inválido, reason vacío, borrado y borrado inexistente. `php artisan test`: 27 tests y 111 aserciones aprobadas.
+- **Etapa 7 completada**: `BlockedItemFilter` (`app/Support/BlockedItemFilter.php`) elimina de una lista normalizada los ids presentes en `blocked_items` para un tipo dado, con una sola consulta `whereIn` por petición.
+- `TvController` aplica el filtro de tipo `tv` a `/tv` y `/tv/adult`; `RadioController` aplica el filtro de tipo `radio` sobre el id de la emisora. En ambos casos se ejecuta después de leer la caché y antes de construir el Resource.
+- No se modificaron `IptvOrgService`, `RadioBrowserService`, sus cachés, el formato JSON ni los códigos HTTP existentes. Si falla la consulta a `blocked_items`, la excepción se propaga y el endpoint responde error en lugar de servir contenido sin filtrar.
+- `BlockedContentFilterTest` simula iptv-org y Radio Browser con `Http::fake`, aísla la caché de archivo y cubre TV, TV adulto, radio, desbloqueo, bloqueo de radio que no afecta a TV, caché caliente y una sola consulta a `blocked_items`. Resultado: 7 tests y 29 aserciones.
+- Prueba real con curl sobre `/api/countries/MX/tv`: 172 canales antes, 171 con `15TV.mx` bloqueado y 172 tras desbloquear. Se usó un token temporal de admin, se eliminó el bloqueo y el token, y se retiraron los scripts temporales.
+- Suite completa tras la etapa 7: 34 tests y 140 aserciones aprobadas.
+- **Etapa 8 completada**: `php artisan test` pasó con 34 tests y 140 aserciones; `php artisan route:list` muestra 18 rutas y ninguna ruta de prueba. Las rutas ajenas a la aplicación son las de framework: `GET /up`, `GET /sanctum/csrf-cookie` y `GET/PUT /storage/{path}`.
+- `api/.env.example` y `api/AGENTS.md` quedaron revisados con las variables y los pasos de instalación desde cero, incluida la creación de `explorador_planet` y `explorador_planet_test` y la migración de la base de test.
+- **Documentación final**: `api/README.md` reescrito en español con puesta en marcha, comprobaciones, tests, endpoints, formatos de respuesta, funcionamiento interno, pendientes y problemas comunes; `README.md` de la raíz actualizado como presentación del proyecto.
+
+## En curso
 
 - **Frontend**: construir el globo 3D y la interfaz en `front/`.
 - **Atlas con datos reales**: implementar `RestCountriesService` y sustituir los mocks.
@@ -123,6 +218,84 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - Implementar recuperación de contraseña.
   - Publicar política de privacidad.
   - Decidir la monetización de TV.
+
+## Pendiente
+
+- **Frontend**: construir el globo 3D y la interfaz en `front/`.
+  - ✅ Vite + JavaScript vanilla configurado
+  - ✅ globe.gl integrado con GeoJSON de países
+  - ✅ Manejo de códigos ISO-2 (caso -99 con campos _eh)
+  - ✅ Países clicables con panel lateral
+  - ✅ Barra de pestañas Radio/TV
+  - ✅ Variables de entorno VITE_API_URL
+  - ✅ .env y .env.example creados
+  - ✅ front/.env y front/node_modules en .gitignore
+  - ✅ front/AGENTS.md actualizado
+  - ⚠️ Falta poblar el globo con datos reales y probar clics
+
+## Decisiones y problemas
+
+### Decisiones
+
+- El proyecto se separa en `api/` (Laravel) y `front/` (globo 3D) como partes independientes del repositorio.
+- La api es **solo API**: no sirve vistas ni assets del front.
+- Todo dato externo pasa por la api antes de llegar al front. El front no consume fuentes externas directamente.
+- La documentación se escribe en español.
+- `api/` usa Laravel 13 en modo API puro: rutas solo en `routes/api.php`, sin `routes/web.php`, vistas ni assets. Sanctum instalado para tokens Bearer; sin Breeze ni Jetstream.
+- MySQL es la base de datos del proyecto. La base local `explorador_planet_db` ya tiene las migraciones ejecutadas; las credenciales viven en `api/.env` y no se versionan.
+- Caché y sesiones usan el driver `file`, y las colas `sync`. Las migraciones propias ya existen y se ejecutaron.
+- Se conservan las migraciones por defecto de Laravel (users, cache, jobs) y se añadieron las de Sanctum, rol, favoritos y bloqueos.
+- El health check nativo de Laravel en `/up` se usa para verificar que el servicio está vivo.
+- Los endpoints de módulos son `GET /api/countries/{code}/atlas`, `/radio` y `/tv`, con un controlador invocable por módulo.
+- El código de país se normaliza a mayúsculas y debe ser exactamente 2 letras ASCII; si no, la api responde `422` con `message` y `errors.code`.
+- Si el código es válido pero no hay datos de atlas, se responde `404` con un mensaje claro. TV y radio devuelven `{"data": []}`.
+- Las respuestas usan API Resources y van envueltas en `data` (objeto para atlas, lista para TV y radio).
+- El contrato de atlas incluye `code`, `name`, `officialName`, `capital`, `region`, `subregion`, `population`, `latlng`, `flag`, `languages` y `currencies`.
+- Los mocks de atlas existen solo para MX, ES y AR; sus URLs son ficticias. TV y radio ya usan datos reales.
+- `RestCountriesService` se mantiene vacío como punto de integración futura.
+- CORS permite `GET`, `POST`, `DELETE` y `OPTIONS` desde cualquier origen para `api/*`.
+- Radio Browser es la fuente del módulo de radio. Se consulta el endpoint por código de país exacto y se piden solo emisoras no rotas, ordenadas por votos descendente y con un máximo de 50.
+- El servicio de radio se identifica con un User-Agent propio (`ExploradorPlanet/1.0`) y aplica un timeout de 5 s por intento de servidor.
+- La rotación de servidores de radio combina descubrimiento DNS y servidores de respaldo, en orden aleatorio, y prueba el siguiente servidor ante error HTTP, respuesta no válida o excepción.
+- La respuesta de Radio Browser se normaliza al contrato de radio antes de cachearse, de modo que el front no depende del formato externo.
+- Las etiquetas de radio se separan por coma, se recortan, se deduplican y se limitan a 5; los campos de texto se recortan y los ausentes se devuelven como cadena vacía.
+- La caché de radio es de 6 h por país en el store `file`; se cachean también los resultados vacíos. Un fallo total de la fuente no se cachea.
+- Si todos los servidores de radio fallan, la api responde `502` con un JSON claro; si el país no tiene emisoras, responde `200` con `data: []`. Los fallos de cada servidor se registran con `Log::warning`.
+- iptv-org es la fuente del módulo de TV: `channels.json` aporta canal, país, categorías, `is_nsfw` y `closed`; `streams.json` aporta URL, calidad, `referrer` y `user_agent`; `blocklist.json` aporta canales bloqueados; `logos.json` aporta los logos.
+- La fuente **no tiene un campo `isOfficial`** (ni en canales ni en streams). No se deriva ni se inventa: se añade `source: "iptv-org"` como trazabilidad de origen, no como garantía de autorización.
+- El contrato de TV añade `source` y `secure`; `secure` es `true` si `streamUrl` empieza por `https://`.
+- Procesar iptv-org un archivo a la vez y liberar cada array con `unset` mantiene el pico de memoria en 94,0 MiB, dentro del límite de 128 MB.
+- La caché de TV es de 6 h por país, separada para adultos y no adultos, y se construye una sola vez por TTL; los fallos de descarga no se cachean.
+- Si iptv-org falla, la api responde `502` con `iptv_org_unavailable`; un país sin canales responde `200` con `data: []`.
+- El endpoint `/tv/adult` existe y está separado de `/tv`, pero **casi siempre devolverá `data: []`**: solo hay 2 canales NSFW con stream en todo el dataset de iptv-org y ninguno está en MX, ES o CO.
+- La autenticación usará Sanctum con tokens Bearer; no habrá autenticación por cookies ni CSRF de SPA.
+- Los tokens de Sanctum expiran a los 30 días. La configuración central es `sanctum.expiration = 43200`; además, cada token creado en la etapa 3 recibe `expires_at` explícito de 30 días.
+- Las rutas `POST /auth/register` y `POST /auth/login` son públicas; `POST /auth/logout` y `GET /auth/me` usan `auth:sanctum`.
+- Las respuestas de registro y login usan `{"data":{"user":{...},"token":"..."}}`; `/me` usa `{"data":{...}}` y logout responde `204` sin cuerpo.
+- La contraseña se valida con mínimo 8 caracteres, mayúsculas, minúsculas, números y confirmación. El registro rechaza cualquier presencia de `role` mediante la regla `missing`, y `role` sigue fuera de `$fillable`.
+- Los emails se normalizan a minúsculas antes de validar y guardar. El login inválido responde `422` con un mensaje genérico para no filtrar la existencia del email.
+- Los rate limits se registran como limitadores nombrados: `login` 5/min por email + IP y `register` 5/min por IP. El sexto intento devuelve `429` JSON.
+- Todos los errores de `/api/*` se renderizan como JSON. `bootstrap/app.php` anula la redirección de invitados y `shouldRenderJsonWhen` cubre `401`, `404`, `429` y el resto de errores de la API.
+- `UserResource` es la única representación pública del usuario y expone solo `id`, `name`, `email` y `role`.
+- Las credenciales del administrador inicial viven solo en `config/admin.php` leyendo `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`; no hay valores por defecto.
+- `admin:create` es idempotente: si el email existe actualiza nombre, contraseña y rol; si no, crea el usuario. El rol se asigna directamente porque no es fillable, y el comando nunca imprime la contraseña.
+- El middleware `admin` se registra como alias en `bootstrap/app.php` y se usa después de `auth:sanctum`; un usuario autenticado sin rol admin recibe `403` con `{"message":"Solo administradores."}`.
+- `phpunit.xml` usa MySQL con `DB_DATABASE=explorador_planet_test`; las demás credenciales salen de `.env`. Los tests que tocan la base usan `DatabaseTransactions` y una comprobación explícita de que la base activa es la de test.
+- El test del middleware define su ruta temporal dentro del test; `routes/api.php` no contiene rutas de prueba.
+- `.env.example` incluye `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD` vacías. `ADMIN_PASSWORD` no debe conservarse en el `.env` local después de crear el administrador.
+- Todo el código nuevo o modificado lleva comentarios en español sobre intención, seguridad e invariantes; la regla está en `AGENTS.md`.
+- El JSON nuevo usará `camelCase` para mantener consistencia con TV y radio: `itemId`, `streamUrl`, `blockedBy`, `createdAt`. En la base se usan columnas `snake_case`.
+- En favoritos, `streamUrl` y `logo` solo aceptan esquemas `http` y `https`; la validación se implementó en la etapa 5.
+- Los DELETE de favoritos y bloqueos usan el `id` numérico; si el recurso no pertenece al usuario, se responde `404`.
+- Un favorito bloqueado se rechaza al crearlo con `422` y se oculta del listado. Los favoritos ocultos siguen contando para el límite de 200.
+- Los favoritos se listan con `latest('id')` y se ocultan con `whereNotExists` contra `blocked_items`; el registro oculto sigue existiendo en `favorites`.
+- `user_id` de un favorito y `blocked_by` de un bloqueo se asignan desde el usuario autenticado mediante relaciones; el body no puede sobrescribirlos.
+- Los bloqueos se listan con `latest('id')`; `BlockedItemResource` expone `blockedBy` como id del admin y las fechas en ISO 8601.
+- Las rutas `/api/admin/blocked` usan `auth:sanctum` + `admin`; el middleware responde 401/403 antes de llegar a la validación o al controlador.
+- El filtrado de bloqueos se aplica después de leer la caché, en `TvController` y `RadioController`, mediante `BlockedItemFilter`; si la base falla, TV y radio responden error y no sirven contenido sin comprobar bloqueos.
+- `BlockedItemFilter` hace una sola consulta a `blocked_items` por petición (`type` + `whereIn` sobre los ids) y conserva el orden y el formato de la lista original.
+- No se usará SQLite: la base de datos del proyecto es MySQL.
+- `symfony/mime` se actualizó a `v8.1.10` por el advisory CVE-2026-45070; no se desactivó la auditoría de Composer.
 
 ## Decisiones y problemas
 
