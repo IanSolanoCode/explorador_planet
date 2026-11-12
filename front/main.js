@@ -6,15 +6,19 @@ const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
 // Países sin código válido en ISO_A2 ni en WB_A2
 const ISO2_EXCEPTIONS = { Norway: 'NO' };
 
-const COLOR_BASE = 'rgba(66, 135, 245, 0.8)';
-const COLOR_SELECCION = 'rgba(255, 215, 0, 0.9)';
+// Colores de país casi transparentes para dejar ver la textura de la Tierra.
+const COLOR_PAIS_BASE = 'rgba(120, 170, 255, 0.10)';
+const COLOR_PAIS_HOVER = 'rgba(255, 215, 0, 0.18)';
+const COLOR_PAIS_SELECCIONADO = 'rgba(255, 215, 0, 0.35)';
 
 let globe = null;
 let selectedFeature = null;
+let hoveredFeature = null;
 let modoActual = 'radio'; // 'radio' o 'tv'
 let controladorAbort = null;
 let audioActual = null;
 let reproduciendoNombre = null;
+let timerRotacion = null;
 
 // --- Lógica de códigos ISO-2 (sin campos _EH) ---
 
@@ -36,8 +40,16 @@ function getName(props) {
 
 function aplicarEstilos() {
   globe
-    .polygonCapColor((f) => (f === selectedFeature ? COLOR_SELECCION : COLOR_BASE))
-    .polygonAltitude((f) => (f === selectedFeature ? 0.08 : 0.01));
+    .polygonCapColor((f) => {
+      if (f === selectedFeature) return COLOR_PAIS_SELECCIONADO;
+      if (f === hoveredFeature) return COLOR_PAIS_HOVER;
+      return COLOR_PAIS_BASE;
+    })
+    .polygonAltitude((f) => {
+      if (f === selectedFeature) return 0.03;
+      if (f === hoveredFeature) return 0.02;
+      return 0.005;
+    });
 }
 
 // --- Actualización del panel lateral ---
@@ -403,10 +415,42 @@ function setupToolbar() {
 
 // --- Manejo de clic en país ---
 
+// Centro aproximado del país: promedio de sus coordenadas, ajustando el
+// antimeridiano (±360) para no cruzar el globo en países como Rusia o Fiyi.
+function calcularCentro(feature) {
+  const puntos = [];
+  const recolectar = (arr) => {
+    if (typeof arr[0] === 'number') {
+      puntos.push(arr);
+    } else {
+      arr.forEach(recolectar);
+    }
+  };
+  const geo = feature.geometry;
+  if (geo && geo.coordinates) recolectar(geo.coordinates);
+  if (!puntos.length) return { lat: 0, lng: 0 };
+
+  const refLng = puntos[0][0];
+  let sumLat = 0;
+  let sumLng = 0;
+  puntos.forEach(([lng, lat]) => {
+    let l = lng;
+    while (l - refLng > 180) l -= 360;
+    while (l - refLng < -180) l += 360;
+    sumLat += lat;
+    sumLng += l;
+  });
+  return { lat: sumLat / puntos.length, lng: sumLng / puntos.length };
+}
+
 function handleCountryClick(feature) {
   selectedFeature = feature;
   aplicarEstilos();
-  
+
+  // Vuelo suave de la cámara hacia el país seleccionado (~1 s).
+  const centro = calcularCentro(feature);
+  globe.pointOfView({ lat: centro.lat, lng: centro.lng, altitude: 1.6 }, 1000);
+
   const iso2 = getIso2(feature.properties);
   modoActual = 'radio'; // Siempre empezar en radio al hacer clic en un país
   
@@ -430,19 +474,57 @@ async function initGlobe() {
 
   globe = Globe()(document.getElementById('globe'))
     .backgroundColor('#0a0a0f')
+    .globeImageUrl('/textures/earth-blue-marble.jpg')
+    .bumpImageUrl('/textures/earth-topology.png')
+    .backgroundImageUrl('/textures/night-sky.png')
+    .showAtmosphere(true)
+    .atmosphereColor('lightskyblue')
+    .atmosphereAltitude(0.1)
     .polygonsData(features)
-    .polygonSideColor(() => 'rgba(0, 100, 200, 0.3)')
-    .polygonStrokeColor(() => '#1a3a6e')
+    .polygonSideColor(() => 'rgba(0, 0, 0, 0)')
+    .polygonStrokeColor(() => 'rgba(160, 190, 255, 0.25)')
+    .polygonsTransitionDuration(300)
     .polygonLabel((f) => {
       const iso2 = getIso2(f.properties);
       const nombre = getName(f.properties);
       return iso2 ? `<b>${nombre}</b> (${iso2})` : `<b>${nombre}</b>`;
     })
-    .onPolygonClick((f) => handleCountryClick(f));
+    .onPolygonClick((f) => handleCountryClick(f))
+    .onPolygonHover((f) => {
+      hoveredFeature = f;
+      aplicarEstilos();
+    });
 
   aplicarEstilos();
-  globe.controls().autoRotate = true;
-  globe.controls().autoRotateSpeed = 0.5;
+  configurarControles();
+  globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2));
+}
+
+// Controles de cámara: inercia, zoom limitado y rotación que se pausa al interactuar
+function configurarControles() {
+  const c = globe.controls();
+  c.enableDamping = true;
+  c.dampingFactor = 0.08;
+  c.minDistance = 150;
+  c.maxDistance = 500;
+  c.autoRotate = true;
+  c.autoRotateSpeed = 0.3;
+
+  c.addEventListener('start', () => {
+    c.autoRotate = false;
+    if (timerRotacion) {
+      clearTimeout(timerRotacion);
+      timerRotacion = null;
+    }
+  });
+
+  c.addEventListener('end', () => {
+    if (timerRotacion) clearTimeout(timerRotacion);
+    timerRotacion = setTimeout(() => {
+      c.autoRotate = true;
+      timerRotacion = null;
+    }, 3000);
+  });
 }
 
 // --- Inicialización de la aplicación ---

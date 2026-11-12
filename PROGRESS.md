@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-11-06
+Última actualización: 2026-11-11
 
 ## Hecho
 
@@ -240,21 +240,31 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - ✅ `PROGRESS.md` actualizado con estado completo
   - ✅ `npm run build` exitoso (64ms, genera `dist/` con index.html, assets y countries/geojson)
   - ✅ Estructura de archivos correcta: index.html, main.js, main.css, .env, .env.example
+- **Frontend — aspecto de planeta y movimiento suave (2026-11-11)**:
+  - ✅ Texturas locales en `front/public/textures/` (copiadas de `node_modules/three-globe/example/img/`): `earth-blue-marble.jpg` (1.39 MiB) para `globeImageUrl`, `earth-topology.png` (369 KiB) para `bumpImageUrl`, `night-sky.png` (883 KiB) para `backgroundImageUrl`. Total ≈ 2.6 MiB; no se copió `clouds.png`.
+  - ✅ Atmósfera: `showAtmosphere(true)`, `atmosphereColor('lightskyblue')`, `atmosphereAltitude(0.1)`.
+  - ✅ Países: `polygonCapColor` casi transparente (alfa 0.10 base / 0.18 hover / 0.35 seleccionado), `polygonSideColor('rgba(0,0,0,0)')`, `polygonStrokeColor('rgba(160,190,255,0.25)')`, `polygonAltitude` 0.005/0.02/0.03 y `polygonsTransitionDuration(300)`.
+  - ✅ Hover con `onPolygonHover` guardando el país en `hoveredFeature` (no existe `polygonStrokeWidth`).
+  - ✅ Cámara: `pointOfView({ lat, lng, altitude: 1.6 }, 1000)` al hacer clic; centro calculado con función propia sobre las coordenadas, corrigiendo antimeridiano.
+  - ✅ Controles (`controls()` = OrbitControls): `enableDamping`, `dampingFactor = 0.08`, `minDistance = 150`, `maxDistance = 500`, `autoRotate = true`, `autoRotateSpeed = 0.3`; la rotación se pausa en el evento `'start'` y se reanuda 3 s después de `'end'`.
+  - ✅ `renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2))`.
+  - ✅ `npm run build` exitoso (1.06s); las tres texturas se copian a `dist/textures/`.
+  - ⚠️ Pendiente de verificación visual en navegador (aspecto y fluidez): no se pudo comprobar aquí.
+- **Entorno — Skills de OpenCode instaladas (2026-11-11)**: se instalaron de forma global (usuario, no por proyecto) las Skills `frontend-design` (oficial de Anthropic, `anthropics/skills`) y `frontend-design-systems` (`composio-community/opencode-skills`), mediante el CLI `skills` con `-g -a opencode`. Quedan en `~\.agents\skills\`, que OpenCode detecta automáticamente, así que estarán disponibles en cualquier proyecto. No se modificó ninguna configuración existente del repositorio. Relevantes para el trabajo pendiente del frontend (`front/`).
 
 ## En curso
 
-- **Frontend**: construcción completada, pendiente de conectar módulos TV/radio a la API
-- **Verificar en navegador**: el globo 3D debería verse en http://localhost:5173 al correr `npm run dev`
-  - NOTA: No fue posible iniciar `npm run dev` en este entorno por limitaciones de shell,
-    pero la construcción `npm run build` confirma que todos los archivos son válidos
-  - Para probar: correr `npm run dev` en el directorio front/ y visitar http://localhost:5173
+- **Frontend**: globo con aspecto de planeta y movimiento suave; módulo Radio conectado
+- **Verificar en navegador**: texturas, atmósfera, hover, vuelo de cámara, damping y rotación deben verse en http://localhost:5173 al correr `npm run dev`
+  - NOTA: `npm run build` confirma que los archivos son válidos, pero el aspecto y la fluidez requieren revisión visual
+  - Para probar: correr `npm run dev` en `front/` y visitar http://localhost:5173
 
 ## Pendiente
 
-- **Frontend**: conectar módulos de TV y radio a la API Laravel (`/api/countries/{code}/tv`, `/radio`)
-- **Probar clics en el globo** en navegador real
-- **Verificar manejo de -99** para Francia, Noruega, Kosovo y otros territorios
-- **Decidir funcionalidad** de la barra Radio/TV (actualmente solo cambia estado visual)
+- **Frontend**: conectar módulo de TV a la API Laravel (`/api/countries/{code}/tv`) — hoy muestra "Próximamente"
+- **Probar clics en el globo y reproducción de audio** en navegador real
+- **Revisión visual**: texturas, atmósfera, hover de países, vuelo de cámara y límites de zoom
+- **Límite conocido**: `<audio>` no reproduce streams `.m3u8` (HLS) en Chrome/Firefox
 
 ## Decisiones y problemas
 
