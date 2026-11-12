@@ -17,8 +17,14 @@ let hoveredFeature = null;
 let modoActual = 'radio'; // 'radio' o 'tv'
 let controladorAbort = null;
 let audioActual = null;
-let reproduciendoNombre = null;
+let emisoraActual = null; // { nombre, url, logo } que suena ahora
+let reproductorEls = null; // referencias al mini reproductor fijo
 let timerRotacion = null;
+
+// Volumen recordado entre visitas: 0–1, con 0.7 por defecto.
+const VOLUMEN_CLAVE = 'explorador-planet:volumen';
+const VOLUMEN_POR_DEFECTO = 0.7;
+let volumenRecordado = cargarVolumen();
 
 // --- Lógica de códigos ISO-2 (sin campos _EH) ---
 
@@ -59,7 +65,10 @@ function actualizarPanel(props, datosRadio = null) {
   const codigo = document.getElementById('country-code');
   const countryName = document.getElementById('country-name');
   const sidebar = document.getElementById('country-info');
-  const reproduciendoDiv = document.querySelector('.reproduciendo');
+
+  // Quitar la lista anterior para no duplicarla al cambiar de país o pestaña.
+  const listaAnterior = sidebar.querySelector('.emisoras');
+  if (listaAnterior) listaAnterior.remove();
 
   // Actualizar nombre del país
   countryName.textContent = getName(props);
@@ -96,87 +105,45 @@ function actualizarPanel(props, datosRadio = null) {
       codigo.style.color = '#e0e0e0';
       // Construir lista con createElement (no innerHTML con datos API)
       const lista = document.createElement('ul');
-      lista.style.margin = '8px 0';
-      lista.style.padding = '0 8px';
-      lista.style.maxHeight = '180px';
-      lista.style.overflowY = 'auto';
-      lista.style.fontSize = '0.75rem';
+      lista.className = 'emisoras';
       
-      datosRadio.emisoras.forEach(est => {
+      datosRadio.emisoras.forEach((est) => {
         const li = document.createElement('li');
-        li.style.margin = '4px 0';
-        li.style.padding = '4px 8px';
-        li.style.background = 'rgba(255,255,255,0.05)';
-        li.style.borderRadius = '4px';
-        li.style.cursor = 'pointer';
+        li.className = 'emisora';
+        li.dataset.url = est.streamUrl || est.url;
         
         // Nombre recortado antes del primer " - "
         const nombreOriginal = est.nombre;
         const nombreCorto = nombreOriginal.split(' - ')[0];
+        const url = est.streamUrl || est.url;
         
-        // Elemento con nombre
+        // Botón real: accesible por teclado y con foco visible.
+        const boton = document.createElement('button');
+        boton.type = 'button';
+        boton.className = 'emisora-boton';
+        boton.setAttribute('aria-label', `Reproducir ${nombreCorto}`);
+
+        // Logo real si viene de http(s); si no o si falla, 📻.
+        boton.appendChild(crearLogoEmisora(est.logo, 'emisora-logo'));
+
         const spanNombre = document.createElement('span');
-        spanNombre.style.display = 'inline-block';
-        spanNombre.style.maxWidth = '60ch';
+        spanNombre.className = 'emisora-nombre';
         spanNombre.textContent = nombreCorto;
         spanNombre.title = nombreOriginal;
+        boton.appendChild(spanNombre);
         
-        // Elemento de logo - usamos un emoji simple en lugar de SVG data URI
-        const spanLogo = document.createElement('span');
-        spanLogo.style.display = 'inline-block';
-        spanLogo.style.width = '16px';
-        spanLogo.style.height = '16px';
-        spanLogo.style.marginLeft = '8px';
-        spanLogo.style.borderRadius = '50%';
-        spanLogo.style.fontSize = '0.875rem';
-        spanLogo.style.color = '#ffd700';
-        spanLogo.textContent = '📻'; // Emoji de radio
-        
-        // Texto descriptivo
-        const spanTextos = document.createElement('span');
-        spanTextos.style.display = 'inline-block';
-        spanTextos.style.verticalAlign = 'middle';
-        spanTextos.style.fontSize = '0.75rem';
-        spanTextos.textContent = nombreCorto;
-        
-        li.appendChild(spanLogo);
-        li.appendChild(spanTextos);
-        
-        // Evento clic para reproducir esta emisora
-        li.addEventListener('click', (e) => {
-          e.stopPropagation();
-          // Reproducir la emisora seleccionada
-          const url = est.streamUrl || est.url;
-          if (url) {
-            // Cancelar audio anterior si existe
-            if (audioActual) {
-              detenerAudio();
-            }
-            reproducirEmisora(url, nombreCorto);
-          }
+        boton.addEventListener('click', () => {
+          if (url) reproducirEmisora(url, nombreCorto, est.logo);
         });
-        
+
+        li.appendChild(boton);
         lista.appendChild(li);
       });
       
-      // Reemplazar el contenido del código con la lista
-      const codigoParent = codigo.parentElement;
-      if (codigoParent && codigoParent.tagName === 'UL') {
-        // Ya tiene lista, hacer nada
-      } else {
-        codigoParent.replaceChild(lista, codigo);
-      }
-      
-      // Mostrar sección "Reproduciendo" si hay un audio reproduciéndose
-      if (reproduciendoNombre) {
-        if (!reproduciendoDiv.classList.contains('activo')) {
-          reproducingDiv.classList.add('activo');
-        }
-        const reproducingNombreEl = reproducingDiv.querySelector('.nombre');
-        if (reproduciendoNombreEl) {
-          reproducingNombreEl.textContent = reproduciendoNombre;
-        }
-      }
+      // Se conserva el <p id="country-code"> y la lista va debajo: así las
+      // siguientes actualizaciones del panel siguen encontrando el código.
+      sidebar.appendChild(lista);
+      marcarEmisoraActiva();
     }
   } else if (modoActual === 'radio' && !datosRadio) {
     // No hay datos todavía o país sin código
@@ -260,112 +227,302 @@ async function cargarRadio(iso2) {
   }
 }
 
-/**
- * Reproduce una emisora de radio en el <audio> del panel.
- * @param {string} streamUrl - URL del stream de audio
- * @param {string} nombre - Nombre de la emisora (mostrado recortado)
- */
-function reproducirEmisora(streamUrl, nombre) {
-  // Si ya hay una reproduciendo, detenerla primero
-  if (audioActual) {
-    detenerAudio();
+// --- Mini reproductor de radio fijo ---
+
+// Lee el volumen guardado validando que sea un número entre 0 y 1.
+function cargarVolumen() {
+  try {
+    const guardado = localStorage.getItem(VOLUMEN_CLAVE);
+    if (guardado === null || guardado.trim() === '') return VOLUMEN_POR_DEFECTO;
+    const valor = Number(guardado);
+    return Number.isFinite(valor) && valor >= 0 && valor <= 1
+      ? valor
+      : VOLUMEN_POR_DEFECTO;
+  } catch {
+    // localStorage puede fallar (modo privado o permisos): usar el valor por defecto.
+    return VOLUMEN_POR_DEFECTO;
   }
-  
-  reproduciendoNombre = nombre;
-  
-  const audio = document.createElement('audio');
-  audio.src = streamUrl;
-  audio.controls = true;
-  audio.style.display = 'none';
-  
-  // Manejar error de reproducción
-  audio.onerror = (e) => {
-    // Mostrar mensaje "Esta emisora no responde"
-    const codigo = document.getElementById('country-code');
-    codigo.textContent = 'Esta emisora no responde';
-    codigo.style.color = '#ff9999';
-    // Quitar el audio de la DOM para liberar recursos
-    if (audio.parentNode) {
-      audio.parentNode.removeChild(audio);
-    }
-    audioActual = null;
-    reproduciendoNombre = null;
-  };
-  
-  // Cuando el audio empieza a reproducirse, actualizar la UI
-  audio.onplay = () => {
-    // Actualizar la sección "Reproduciendo" en el panel
-    const sidebar = document.getElementById('country-info');
-    let reproduciendoDiv = sidebar.querySelector('.reproduciendo');
-    
-    if (!reproduciendoDiv) {
-      reproduciendoDiv = document.createElement('div');
-      reproducingDiv.className = 'reproduciendo activo';
-      reproducingDiv.innerHTML = `<span class="nombre"></span><button class="btn-detener">Detener</button>`;
-      sidebar.insertBefore(reproduciendoDiv, sidebar.firstChild);
-    }
-    
-    const nombreEl = reproducingDiv.querySelector('.nombre');
-    if (nombreEl) {
-      nombreEl.textContent = nombre;
-    }
-    
-    const btnDetener = reproducingDiv.querySelector('.btn-detener');
-    if (btnDetener) {
-      btnDetener.onclick = detenerAudio;
-    }
-  };
-  
-  // Empezar a reproducir (intento automático)
-  const playPromise = audio.play();
-  
-  if (playPromise !== undefined) {
-    playPromise.then(() => {
-      audioActual = audio;
-      // Asegurar que la sección "Reproduciendo" sea visible
-      const sidebar = document.getElementById('country-info');
-      let reproducingDiv = sidebar.querySelector('.reproduciendo');
-      if (!reproduciendoDiv) {
-        reproducingDiv = document.createElement('div');
-        reproducingDiv.className = 'reproduciendo activo';
-        reproducingDiv.innerHTML = `<span class="nombre"></span><button class="btn-detener">Detener</button>`;
-        sidebar.insertBefore(reproduciendoDiv, sidebar.firstChild);
-      }
-    }).catch((e) => {
-      console.error('Error al intentar reproducir audio automáticamente:', e);
-      // El usuario tendría que hacer clic en play
-      audioActual = audio;
+}
+
+function guardarVolumen(valor) {
+  try {
+    localStorage.setItem(VOLUMEN_CLAVE, String(valor));
+  } catch {
+    // Si no se puede persistir, el volumen sigue funcionando en esta sesión.
+  }
+}
+
+// Logo de emisora: <img loading="lazy"> solo para http(s); el resto es 📻.
+// Si la imagen falla, se reemplaza por el emoji.
+function crearLogoEmisora(urlLogo, clase) {
+  if (typeof urlLogo === 'string' && /^https?:\/\//i.test(urlLogo)) {
+    const img = document.createElement('img');
+    img.className = clase;
+    img.loading = 'lazy';
+    img.alt = ''; // Decorativo: el nombre de la emisora ya está al lado.
+    img.addEventListener('error', () => {
+      const emoji = document.createElement('span');
+      emoji.className = clase;
+      emoji.textContent = '📻';
+      img.replaceWith(emoji);
     });
+    // El src solo se asigna tras validar el esquema http(s).
+    img.src = urlLogo;
+    return img;
   }
-  
-  // Guardar referencia al audio
-  audioActual = audio;
-  
-  // Agregar al DOM (será removido al detener)
-  const sidebar = document.getElementById('country-info');
-  sidebar.appendChild(audio);
+  const emoji = document.createElement('span');
+  emoji.className = clase;
+  emoji.textContent = '📻';
+  return emoji;
+}
+
+// Construye una sola vez el reproductor fijo y guarda sus referencias.
+function crearReproductor() {
+  if (reproductorEls) return;
+
+  const contenedor = document.createElement('section');
+  contenedor.id = 'radio-player';
+  contenedor.className = 'reproductor';
+  contenedor.hidden = true; // Oculto hasta que haya una emisora.
+  contenedor.setAttribute('aria-label', 'Reproductor de radio');
+
+  const logo = crearLogoEmisora('', 'reproductor-logo');
+
+  const info = document.createElement('div');
+  info.className = 'reproductor-info';
+
+  const nombre = document.createElement('span');
+  nombre.className = 'reproductor-nombre';
+
+  const estado = document.createElement('span');
+  estado.className = 'reproductor-estado';
+  estado.setAttribute('aria-live', 'polite');
+
+  const controles = document.createElement('div');
+  controles.className = 'reproductor-controles';
+
+  const btnPausa = document.createElement('button');
+  btnPausa.type = 'button';
+  btnPausa.className = 'btn-control';
+  btnPausa.setAttribute('aria-label', 'Pausar');
+  btnPausa.textContent = '⏸';
+  btnPausa.addEventListener('click', alternarPausa);
+
+  const btnMute = document.createElement('button');
+  btnMute.type = 'button';
+  btnMute.className = 'btn-control';
+  btnMute.setAttribute('aria-label', 'Silenciar');
+  btnMute.setAttribute('aria-pressed', 'false');
+  btnMute.textContent = '🔊';
+  btnMute.addEventListener('click', alternarSilencio);
+
+  const volumen = document.createElement('input');
+  volumen.type = 'range';
+  volumen.className = 'volumen';
+  volumen.min = '0';
+  volumen.max = '1';
+  volumen.step = '0.01';
+  volumen.value = String(volumenRecordado);
+  volumen.setAttribute('aria-label', 'Volumen');
+  volumen.addEventListener('input', () => {
+    volumenRecordado = Number(volumen.value);
+    if (audioActual) audioActual.volume = volumenRecordado;
+    guardarVolumen(volumenRecordado);
+  });
+
+  const btnDetener = document.createElement('button');
+  btnDetener.type = 'button';
+  btnDetener.className = 'btn-control';
+  btnDetener.setAttribute('aria-label', 'Detener');
+  btnDetener.textContent = '⏹';
+  btnDetener.addEventListener('click', detenerAudio);
+
+  info.appendChild(nombre);
+  info.appendChild(estado);
+  controles.appendChild(btnPausa);
+  controles.appendChild(btnMute);
+  controles.appendChild(volumen);
+  controles.appendChild(btnDetener);
+  contenedor.appendChild(logo);
+  contenedor.appendChild(info);
+  contenedor.appendChild(controles);
+  document.body.appendChild(contenedor);
+
+  reproductorEls = { contenedor, logo, nombre, estado, btnPausa, btnMute, volumen, btnDetener };
+}
+
+function setEstadoReproductor(estado) {
+  if (!reproductorEls) return;
+  const textos = {
+    conectando: 'Conectando...',
+    reproduciendo: 'Reproduciendo',
+    error: 'Esta emisora no responde',
+  };
+  reproductorEls.estado.textContent = textos[estado] || '';
+  reproductorEls.contenedor.dataset.estado = estado;
+}
+
+function actualizarLogoReproductor(urlLogo) {
+  if (!reproductorEls) return;
+  const nuevo = crearLogoEmisora(urlLogo, 'reproductor-logo');
+  // Se busca en el DOM porque el logo anterior pudo ser reemplazado por el
+  // emoji tras un error de carga (y ya no estaría enlazado a reproductorEls).
+  const anterior = reproductorEls.contenedor.querySelector('.reproductor-logo');
+  if (anterior) {
+    anterior.replaceWith(nuevo);
+  } else {
+    reproductorEls.contenedor.prepend(nuevo);
+  }
+  reproductorEls.logo = nuevo;
+}
+
+function actualizarBotonPausa() {
+  if (!reproductorEls) return;
+  const pausado = !audioActual || audioActual.paused;
+  reproductorEls.btnPausa.textContent = pausado ? '▶' : '⏸';
+  reproductorEls.btnPausa.setAttribute('aria-label', pausado ? 'Reanudar' : 'Pausar');
+}
+
+function actualizarBotonSilencio() {
+  if (!reproductorEls) return;
+  const mudo = !!(audioActual && audioActual.muted);
+  reproductorEls.btnMute.textContent = mudo ? '🔇' : '🔊';
+  reproductorEls.btnMute.setAttribute('aria-label', mudo ? 'Activar sonido' : 'Silenciar');
+  reproductorEls.btnMute.setAttribute('aria-pressed', mudo ? 'true' : 'false');
+}
+
+// Marca en la lista la emisora que está sonando (por URL del stream).
+function marcarEmisoraActiva() {
+  document.querySelectorAll('.emisora').forEach((li) => {
+    const activa = !!(emisoraActual && li.dataset.url === emisoraActual.url);
+    li.classList.toggle('activa', activa);
+    const boton = li.querySelector('.emisora-boton');
+    if (boton) boton.setAttribute('aria-current', activa ? 'true' : 'false');
+  });
+}
+
+function alternarPausa() {
+  if (!audioActual) return;
+  if (audioActual.paused) {
+    setEstadoReproductor('conectando');
+    const intento = audioActual.play();
+    if (intento !== undefined) {
+      intento.catch((e) => {
+        // AbortError: la reproducción se canceló (cambio de emisora o load()).
+        if (e && e.name === 'AbortError') return;
+        setEstadoReproductor('error');
+        actualizarBotonPausa();
+      });
+    }
+  } else {
+    audioActual.pause();
+  }
+  actualizarBotonPausa();
+}
+
+function alternarSilencio() {
+  if (!audioActual) return;
+  audioActual.muted = !audioActual.muted;
+  actualizarBotonSilencio();
 }
 
 /**
- * Detiene la reproducción de audio actual.
+ * Reproduce una emisora en el <audio> del mini reproductor.
+ * @param {string} streamUrl - URL del stream de audio
+ * @param {string} nombre - Nombre de la emisora (recortado)
+ * @param {string} logo - URL del logo (puede venir vacía)
+ */
+function reproducirEmisora(streamUrl, nombre, logo) {
+  crearReproductor();
+
+  // Cortar el audio anterior sin ocultar el reproductor.
+  if (audioActual) {
+    const anterior = audioActual;
+    audioActual = null;
+    anterior.pause();
+    anterior.removeAttribute('src');
+    anterior.load();
+    if (anterior.parentNode) anterior.parentNode.removeChild(anterior);
+  }
+
+  emisoraActual = { nombre, url: streamUrl, logo: logo || '' };
+
+  reproductorEls.contenedor.hidden = false;
+  reproductorEls.nombre.textContent = nombre;
+  actualizarLogoReproductor(logo);
+  setEstadoReproductor('conectando');
+  marcarEmisoraActiva();
+
+  const audio = document.createElement('audio');
+  audio.style.display = 'none';
+  audio.volume = volumenRecordado;
+  audio.muted = false;
+
+  // Solo actualizar la UI si este audio sigue siendo el actual.
+  audio.addEventListener('playing', () => {
+    if (audio !== audioActual) return;
+    setEstadoReproductor('reproduciendo');
+    actualizarBotonPausa();
+  });
+
+  audio.addEventListener('waiting', () => {
+    if (audio !== audioActual) return;
+    // Un corte durante la reproducción se muestra como "Conectando...".
+    if (!audio.paused) setEstadoReproductor('conectando');
+  });
+
+  audio.addEventListener('error', () => {
+    if (audio !== audioActual) return;
+    setEstadoReproductor('error');
+    actualizarBotonPausa();
+  });
+
+  audio.addEventListener('play', actualizarBotonPausa);
+  audio.addEventListener('pause', actualizarBotonPausa);
+
+  audio.src = streamUrl;
+  document.body.appendChild(audio);
+  audioActual = audio;
+
+  actualizarBotonSilencio();
+  actualizarBotonPausa();
+
+  const intento = audio.play();
+  if (intento !== undefined) {
+    intento
+      .then(() => {
+        if (audio !== audioActual) return;
+        actualizarBotonPausa();
+      })
+      .catch((e) => {
+        if (audio !== audioActual) return;
+        // AbortError: se canceló por cambiar de emisora o por load().
+        if (e && e.name === 'AbortError') return;
+        setEstadoReproductor('error');
+        actualizarBotonPausa();
+      });
+  }
+}
+
+/**
+ * Detiene la reproducción, libera el stream y oculta el mini reproductor.
  */
 function detenerAudio() {
-  if (audioActual && audioActual.pause) {
-    audioActual.pause();
-    audioActual.load(); // Liberar recursos del navegador
-    const parent = audioActual.parentNode;
-    if (parent) {
-      parent.removeChild(audioActual);
-    }
+  if (audioActual) {
+    const audio = audioActual;
+    audioActual = null;
+    audio.pause();
+    audio.removeAttribute('src');
+    audio.load(); // Liberar recursos del navegador
+    if (audio.parentNode) audio.parentNode.removeChild(audio);
   }
-  
-  audioActual = null;
-  reproduciendoNombre = null;
-  
-  // Ocultar sección "Reproduciendo"
-  const reproduciendoDiv = document.querySelector('.reproduciendo');
-  if (reproduciendoDiv) {
-    reproducingDiv.remove();
+
+  emisoraActual = null;
+  marcarEmisoraActiva();
+
+  if (reproductorEls) {
+    reproductorEls.contenedor.hidden = true;
+    setEstadoReproductor('inactivo');
   }
 }
 
@@ -531,6 +688,7 @@ function configurarControles() {
 
 async function init() {
   await initGlobe();
+  crearReproductor();
   setupToolbar();
   
   // Verificar que la variable de entorno esté configurada

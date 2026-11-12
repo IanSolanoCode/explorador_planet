@@ -250,11 +250,21 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - ✅ `renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2))`.
   - ✅ `npm run build` exitoso (1.06s); las tres texturas se copian a `dist/textures/`.
   - ⚠️ Pendiente de verificación visual en navegador (aspecto y fluidez): no se pudo comprobar aquí.
+- **Frontend — mini reproductor de radio fijo (2026-11-11)**:
+  - ✅ Sección `.reproduciendo` eliminada por completo (markup y CSS); con ella desaparece el bug de `reproducingDiv` sin definir.
+  - ✅ Mini reproductor fijo abajo a la izquierda, construido con `createElement`/`textContent`, visible aunque cambie el país o el panel; se oculta al detener o al cambiar a TV.
+  - ✅ Controles: pausar/reanudar, silenciar (`aria-pressed`), volumen (`input range`) y detener (`pause()` + `removeAttribute('src')` + `load()`), con `aria-label` dinámicos y `:focus-visible`.
+  - ✅ Estados "Conectando...", "Reproduciendo" y "Esta emisora no responde". Los rechazos de `play()` con `AbortError` se ignoran; otros rechazos y el evento `error` del `<audio>` muestran el estado de error.
+  - ✅ Volumen persistido en `localStorage` (clave `explorador-planet:volumen`) dentro de `try/catch`; al leerlo se valida que sea un número entre 0 y 1 y, si no, se usa 0.7.
+  - ✅ Logos reales con `<img loading="lazy" alt="">` solo si la URL empieza por `http://` o `https://`; si falta o falla la carga, se muestra 📻.
+  - ✅ Lista de emisoras como tarjetas (`.emisora`) con hover y marca `.activa` en la que suena; el `<p id="country-code">` se conserva para que el panel siga actualizándose sin errores.
+  - ✅ `npm run build` exitoso (559 ms; CSS 3.37 kB, JS 1.985,45 kB). Solo el aviso conocido de chunk >500 kB.
+  - ⚠️ Sin verificar en navegador: reproducción real de streams, persistencia del volumen entre recargas, aspecto del hover/foco y comportamiento con logos caídos.
 - **Entorno — Skills de OpenCode instaladas (2026-11-11)**: se instalaron de forma global (usuario, no por proyecto) las Skills `frontend-design` (oficial de Anthropic, `anthropics/skills`) y `frontend-design-systems` (`composio-community/opencode-skills`), mediante el CLI `skills` con `-g -a opencode`. Quedan en `~\.agents\skills\`, que OpenCode detecta automáticamente, así que estarán disponibles en cualquier proyecto. No se modificó ninguna configuración existente del repositorio. Relevantes para el trabajo pendiente del frontend (`front/`).
 
 ## En curso
 
-- **Frontend**: globo con aspecto de planeta y movimiento suave; módulo Radio conectado
+- **Frontend**: globo con aspecto de planeta, módulo Radio conectado y mini reproductor fijo
 - **Verificar en navegador**: texturas, atmósfera, hover, vuelo de cámara, damping y rotación deben verse en http://localhost:5173 al correr `npm run dev`
   - NOTA: `npm run build` confirma que los archivos son válidos, pero el aspecto y la fluidez requieren revisión visual
   - Para probar: correr `npm run dev` en `front/` y visitar http://localhost:5173
@@ -262,7 +272,8 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 ## Pendiente
 
 - **Frontend**: conectar módulo de TV a la API Laravel (`/api/countries/{code}/tv`) — hoy muestra "Próximamente"
-- **Probar clics en el globo y reproducción de audio** en navegador real
+- **Probar clics en el globo, reproducción de audio y controles del mini reproductor** en navegador real
+- **Probar persistencia del volumen** entre recargas y el fallback 📻 cuando un logo no carga
 - **Revisión visual**: texturas, atmósfera, hover de países, vuelo de cámara y límites de zoom
 - **Límite conocido**: `<audio>` no reproduce streams `.m3u8` (HLS) en Chrome/Firefox
 

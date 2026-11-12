@@ -39,45 +39,188 @@ aside.hidden {
 
 aside h3 {
   font-size: 1.2rem;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   color: #ffd700;
 }
 
 aside p {
   font-size: 0.875rem;
   color: #aaa;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
-/* Nueva sección: "Reproduciendo" en el panel */
-.reproduciendo {
-  margin-top: 16px;
-  padding-top: 16px;
-  border-top: 1px solid #3a3a5a;
-  min-height: 32px;
+/* Lista de emisoras como tarjetas */
+.emisoras {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-.reproduciendo.activo {
-  display: block;
+.emisora {
+  border: 1px solid rgba(120, 140, 200, 0.25);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.04);
+  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
 }
 
-.reproduciendo .nombre {
-  color: #ffd700;
-  font-weight: bold;
-  font-size: 0.875rem;
+.emisora:hover {
+  background: rgba(255, 255, 255, 0.09);
+  border-color: rgba(160, 190, 255, 0.45);
+  transform: translateX(2px);
 }
 
-.reproduciendo .btn-detener {
-  margin-left: 12px;
-  padding: 4px 8px;
-  background: rgba(255, 153, 51, 0.3);
-  border: 1px solid #ff9933;
-  border-radius: 4px;
-  color: #ff9933;
-  font-size: 0.75rem;
+.emisora.activa {
+  background: rgba(255, 215, 0, 0.10);
+  border-color: #ffd700;
+}
+
+.emisora-boton {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  background: none;
+  border: 0;
+  color: #e0e0e0;
+  font: inherit;
+  font-size: 0.8rem;
+  text-align: left;
   cursor: pointer;
-  vertical-align: middle;
+}
+
+.emisora-logo {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  font-size: 1rem;
+  line-height: 20px;
+  text-align: center;
+}
+
+.emisora-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.emisora.activa .emisora-nombre {
+  color: #ffd700;
+}
+
+/* Mini reproductor fijo: visible mientras haya una emisora */
+.reproductor {
+  position: fixed;
+  left: 20px;
+  bottom: 20px;
+  z-index: 120;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: min(420px, calc(100vw - 40px));
+  padding: 12px 14px;
+  background: rgba(10, 10, 15, 0.85);
+  border: 1px solid #3a3a5a;
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+}
+
+.reproductor[hidden] {
+  display: none;
+}
+
+.reproductor-logo {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border-radius: 50%;
+  object-fit: cover;
+  font-size: 1.5rem;
+  line-height: 32px;
+  text-align: center;
+}
+
+.reproductor-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.reproductor-nombre {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #ffd700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reproductor-estado {
+  font-size: 0.72rem;
+  color: #aaa;
+}
+
+.reproductor[data-estado="conectando"] .reproductor-estado {
+  color: #ffd700;
+}
+
+.reproductor[data-estado="reproduciendo"] .reproductor-estado {
+  color: #7ee787;
+}
+
+.reproductor[data-estado="error"] .reproductor-estado {
+  color: #ff9999;
+}
+
+.reproductor-controles {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.btn-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #4a4a7a;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 0.9rem;
   line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-control:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #6a6a9a;
+}
+
+.reproductor-controles input[type="range"] {
+  width: 84px;
+  accent-color: #ffd700;
+  cursor: pointer;
+}
+
+.btn-control:focus-visible,
+.emisora-boton:focus-visible,
+.tab-btn:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
 }
 
 nav {
