@@ -14,7 +14,8 @@
   "license": "ISC",
   "type": "module",
   "dependencies": {
-    "globe.gl": "^2.46.2"
+    "globe.gl": "^2.46.2",
+    "hls.js": "^1.7.4"
   },
   "devDependencies": {
     "vite": "^8.3.6"

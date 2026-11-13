@@ -260,22 +260,33 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - ✅ Lista de emisoras como tarjetas (`.emisora`) con hover y marca `.activa` en la que suena; el `<p id="country-code">` se conserva para que el panel siga actualizándose sin errores.
   - ✅ `npm run build` exitoso (559 ms; CSS 3.37 kB, JS 1.985,45 kB). Solo el aviso conocido de chunk >500 kB.
   - ⚠️ Sin verificar en navegador: reproducción real de streams, persistencia del volumen entre recargas, aspecto del hover/foco y comportamiento con logos caídos.
+- **Frontend — pestaña TV y reproductor fijo (2026-11-12)**:
+  - ✅ `hls.js@1.7.4` instalado como única dependencia nueva y cargado con `import('hls.js')` dinámico (Vite genera un chunk aparte de 579,11 kB).
+  - ✅ `cargarTv(iso2)` con `AbortController` propio; consume el contrato TV `{ data: [{ name, streamUrl, logo, category, secure }] }`.
+  - ✅ Panel TV con estados "Cargando...", "Sin canales para este país", error mostrando la URL intentada y "Este territorio no tiene código de país"; tarjetas con logo real (respaldo 📺), nombre, categoría y aviso "Enlace no seguro" si `secure === false`.
+  - ✅ Reproductor de TV fijo abajo a la izquierda (360 px, máx. 90vw), separado del de radio, con `<video>`, pausar/reanudar, silenciar, volumen compartido con radio, pantalla completa del contenedor y detener.
+  - ✅ Orden de reproducción: hls.js si `Hls.isSupported()`, si no HLS nativo con `canPlayType('application/vnd.apple.mpegurl')`, si no estado de error. Mensaje: "Este canal no responde o no permite reproducirse desde el navegador".
+  - ✅ Errores fatales de hls.js muestran el error y llaman a `destroy()`; cambiar de canal o detener también destruyen la instancia anterior. `AbortError` y respuestas de peticiones viejas se ignoran.
+  - ✅ Radio y TV mutuamente excluyentes; cambiar de pestaña detiene lo que esté sonando. El clic de país respeta la pestaña activa.
+  - ✅ `npm run build` exitoso (1.01 s; hls.js separado en su propio chunk). Solo el aviso conocido de chunks >500 kB.
+  - ⚠️ Sin verificar en navegador: reproducción real de streams HLS, ruta nativa en Safari/iOS, pantalla completa, aviso `secure`, CORS y contenido mixto HTTP/HTTPS.
 - **Entorno — Skills de OpenCode instaladas (2026-11-11)**: se instalaron de forma global (usuario, no por proyecto) las Skills `frontend-design` (oficial de Anthropic, `anthropics/skills`) y `frontend-design-systems` (`composio-community/opencode-skills`), mediante el CLI `skills` con `-g -a opencode`. Quedan en `~\.agents\skills\`, que OpenCode detecta automáticamente, así que estarán disponibles en cualquier proyecto. No se modificó ninguna configuración existente del repositorio. Relevantes para el trabajo pendiente del frontend (`front/`).
 
 ## En curso
 
-- **Frontend**: globo con aspecto de planeta, módulo Radio conectado y mini reproductor fijo
+- **Frontend**: globo con aspecto de planeta, módulos Radio y TV conectados, con reproductores fijos separados
 - **Verificar en navegador**: texturas, atmósfera, hover, vuelo de cámara, damping y rotación deben verse en http://localhost:5173 al correr `npm run dev`
   - NOTA: `npm run build` confirma que los archivos son válidos, pero el aspecto y la fluidez requieren revisión visual
   - Para probar: correr `npm run dev` en `front/` y visitar http://localhost:5173
 
 ## Pendiente
 
-- **Frontend**: conectar módulo de TV a la API Laravel (`/api/countries/{code}/tv`) — hoy muestra "Próximamente"
-- **Probar clics en el globo, reproducción de audio y controles del mini reproductor** en navegador real
-- **Probar persistencia del volumen** entre recargas y el fallback 📻 cuando un logo no carga
+- **Probar clics en el globo, reproducción de audio/video y controles de ambos reproductores** en navegador real
+- **Probar canales HLS** en Chrome/Firefox (hls.js) y Safari/iOS (ruta nativa), incluida la pantalla completa
+- **Probar persistencia del volumen** entre recargas y el fallback 📻/📺 cuando un logo no carga
+- **Valorar el botón +18** en una etapa posterior (hoy no existe)
 - **Revisión visual**: texturas, atmósfera, hover de países, vuelo de cámara y límites de zoom
-- **Límite conocido**: `<audio>` no reproduce streams `.m3u8` (HLS) en Chrome/Firefox
+- **Límite conocido**: algunos streams HTTP pueden ser bloqueados como contenido mixto si el front se sirve por HTTPS
 
 ## Decisiones y problemas
 
@@ -405,6 +416,9 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - `BlockedItemFilter` hace una sola consulta a `blocked_items` por petición (`type` + `whereIn` sobre los ids) y conserva el orden y el formato de la lista original.
 - No se usará SQLite: la base de datos del proyecto es MySQL.
 - `symfony/mime` se actualizó a `v8.1.10` por el advisory CVE-2026-45070; no se desactivó la auditoría de Composer.
+- Frontend TV: `hls.js` es la única dependencia nueva y se carga con `import()` dinámico para no aumentar la carga inicial. Se prefiere hls.js cuando `Hls.isSupported()`; si no, se usa HLS nativo vía `canPlayType('application/vnd.apple.mpegurl')`.
+- Frontend: radio y TV son mutuamente excluyentes y comparten el volumen persistido en `explorador-planet:volumen`. El reproductor de TV ocupa el mismo hueco fijo abajo a la izquierda y pide pantalla completa sobre su contenedor para mantener los controles visibles.
+- No se añade botón +18 en esta etapa: el endpoint `/tv` ya excluye el contenido adulto.
 
 ### Problemas abiertos
 

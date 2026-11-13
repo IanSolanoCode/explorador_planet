@@ -21,6 +21,15 @@ let emisoraActual = null; // { nombre, url, logo } que suena ahora
 let reproductorEls = null; // referencias al mini reproductor fijo
 let timerRotacion = null;
 
+// TV: estado independiente del reproductor de radio.
+let controladorTv = null;
+let videoActual = null;
+let hlsActual = null;
+let canalActual = null; // { nombre, url } del canal en reproducción
+let reproductorTvEls = null;
+let intentoTv = 0; // invalida arranques asíncronos antiguos (import de hls.js)
+let HlsClase = null; // módulo hls.js cargado bajo demanda
+
 // Volumen recordado entre visitas: 0–1, con 0.7 por defecto.
 const VOLUMEN_CLAVE = 'explorador-planet:volumen';
 const VOLUMEN_POR_DEFECTO = 0.7;
@@ -66,9 +75,9 @@ function actualizarPanel(props, datosRadio = null) {
   const countryName = document.getElementById('country-name');
   const sidebar = document.getElementById('country-info');
 
-  // Quitar la lista anterior para no duplicarla al cambiar de país o pestaña.
-  const listaAnterior = sidebar.querySelector('.emisoras');
-  if (listaAnterior) listaAnterior.remove();
+  // Quitar listas anteriores (radio o TV) para no mezclar modos.
+  const listasAnteriores = sidebar.querySelectorAll('.emisoras, .canales');
+  listasAnteriores.forEach((lista) => lista.remove());
 
   // Actualizar nombre del país
   countryName.textContent = getName(props);
@@ -150,12 +159,6 @@ function actualizarPanel(props, datosRadio = null) {
     if (!iso2) {
       codigo.textContent = 'Este territorio no tiene código de país';
       codigo.style.color = '#ff9999';
-    }
-  } else {
-    // Modo TV: mostrar "Próximamente"
-    if (modoActual === 'tv') {
-      codigo.textContent = 'Próximamente';
-      codigo.style.color = '#aaa';
     }
   }
 
@@ -252,28 +255,28 @@ function guardarVolumen(valor) {
   }
 }
 
-// Logo de emisora: <img loading="lazy"> solo para http(s); el resto es 📻.
-// Si la imagen falla, se reemplaza por el emoji.
-function crearLogoEmisora(urlLogo, clase) {
+// Logo de emisora: <img loading="lazy"> solo para http(s); el resto es un emoji.
+// Si la imagen falla, se reemplaza por el emoji indicado (📻 radio, 📺 TV).
+function crearLogoEmisora(urlLogo, clase, emoji = '📻') {
   if (typeof urlLogo === 'string' && /^https?:\/\//i.test(urlLogo)) {
     const img = document.createElement('img');
     img.className = clase;
     img.loading = 'lazy';
     img.alt = ''; // Decorativo: el nombre de la emisora ya está al lado.
     img.addEventListener('error', () => {
-      const emoji = document.createElement('span');
-      emoji.className = clase;
-      emoji.textContent = '📻';
-      img.replaceWith(emoji);
+      const respaldo = document.createElement('span');
+      respaldo.className = clase;
+      respaldo.textContent = emoji;
+      img.replaceWith(respaldo);
     });
     // El src solo se asigna tras validar el esquema http(s).
     img.src = urlLogo;
     return img;
   }
-  const emoji = document.createElement('span');
-  emoji.className = clase;
-  emoji.textContent = '📻';
-  return emoji;
+  const respaldo = document.createElement('span');
+  respaldo.className = clase;
+  respaldo.textContent = emoji;
+  return respaldo;
 }
 
 // Construye una sola vez el reproductor fijo y guarda sus referencias.
@@ -392,8 +395,9 @@ function actualizarBotonSilencio() {
 }
 
 // Marca en la lista la emisora que está sonando (por URL del stream).
+// Se limita a la lista de radio: la de TV reutiliza clases de tarjeta.
 function marcarEmisoraActiva() {
-  document.querySelectorAll('.emisora').forEach((li) => {
+  document.querySelectorAll('.emisoras:not(.canales) .emisora').forEach((li) => {
     const activa = !!(emisoraActual && li.dataset.url === emisoraActual.url);
     li.classList.toggle('activa', activa);
     const boton = li.querySelector('.emisora-boton');
@@ -434,6 +438,7 @@ function alternarSilencio() {
  */
 function reproducirEmisora(streamUrl, nombre, logo) {
   crearReproductor();
+  detenerTv(); // Solo puede sonar radio o TV, no ambas.
 
   // Cortar el audio anterior sin ocultar el reproductor.
   if (audioActual) {
@@ -526,6 +531,493 @@ function detenerAudio() {
   }
 }
 
+// --- Pestaña TV ---
+
+/**
+ * Carga los canales de TV de un país.
+ * Usa su propio AbortController para descartar la petición anterior.
+ * @param {string} iso2 - Código ISO-2 de 2 letras
+ * @returns {Promise<Object>} estado de carga, canales normalizados y URL intentada
+ */
+async function cargarTv(iso2) {
+  if (controladorTv) controladorTv.abort();
+  controladorTv = new AbortController();
+
+  const url = `${API_BASE}/countries/${iso2}/tv`;
+
+  try {
+    const res = await fetch(url, { signal: controladorTv.signal });
+
+    if (!res.ok) {
+      return { error: true, url };
+    }
+
+    const data = await res.json();
+
+    if (!data || !Array.isArray(data.data)) {
+      return { error: false, vacio: true, canales: [], url };
+    }
+
+    const canales = data.data
+      .filter((canal) => canal && canal.streamUrl)
+      .map((canal) => ({
+        nombre: canal.name || 'Sin nombre',
+        streamUrl: canal.streamUrl,
+        logo: canal.logo || '',
+        categoria: canal.category || '',
+        // La API envía booleano; solo un false explícito marca el enlace como inseguro.
+        secure: canal.secure !== false,
+      }));
+
+    return {
+      error: false,
+      vacio: canales.length === 0,
+      canales,
+      url,
+    };
+  } catch (e) {
+    if (e.name === 'AbortError') {
+      return { cancelled: true };
+    }
+    console.error('Error cargando TV:', e);
+    return { error: true, url };
+  }
+}
+
+// Pinta el panel en modo TV con los mismos estados que radio.
+function actualizarPanelTv(props, datos = null) {
+  if (!props) return;
+
+  const iso2 = getIso2(props);
+  const codigo = document.getElementById('country-code');
+  const countryName = document.getElementById('country-name');
+  const sidebar = document.getElementById('country-info');
+
+  // Quitar listas anteriores (radio o TV) para no mezclar modos.
+  sidebar.querySelectorAll('.emisoras, .canales').forEach((lista) => lista.remove());
+
+  countryName.textContent = getName(props);
+
+  if (iso2) {
+    codigo.textContent = `Código ISO-2: ${iso2}`;
+    codigo.style.color = '#e0e0e0';
+  } else {
+    codigo.textContent = 'Este territorio no tiene código de país';
+    codigo.style.color = '#ff9999';
+    return;
+  }
+
+  if (!datos || datos.cancelled) return;
+
+  if (datos.loading) {
+    codigo.textContent = 'Cargando...';
+    codigo.style.color = '#ffd700';
+    return;
+  }
+
+  if (datos.error) {
+    codigo.textContent = `No se pudo cargar la TV desde ${datos.url}`;
+    codigo.style.color = '#ff9999';
+    return;
+  }
+
+  if (datos.vacio) {
+    codigo.textContent = 'Sin canales para este país';
+    codigo.style.color = '#aaa';
+    return;
+  }
+
+  codigo.textContent = '';
+  codigo.style.color = '#e0e0e0';
+
+  // Tarjetas construidas solo con createElement/textContent (datos de la API).
+  const lista = document.createElement('ul');
+  lista.className = 'emisoras canales';
+
+  datos.canales.forEach((canal) => {
+    const li = document.createElement('li');
+    li.className = 'emisora canal';
+    li.dataset.url = canal.streamUrl;
+
+    const boton = document.createElement('button');
+    boton.type = 'button';
+    boton.className = 'emisora-boton canal-boton';
+    boton.setAttribute('aria-label', `Reproducir ${canal.nombre}`);
+
+    // Logo real si es http(s); si falta o falla, 📺.
+    boton.appendChild(crearLogoEmisora(canal.logo, 'emisora-logo canal-logo', '📺'));
+
+    const info = document.createElement('span');
+    info.className = 'canal-info';
+
+    const spanNombre = document.createElement('span');
+    spanNombre.className = 'emisora-nombre canal-nombre';
+    spanNombre.textContent = canal.nombre;
+    info.appendChild(spanNombre);
+
+    if (canal.categoria) {
+      const spanCategoria = document.createElement('span');
+      spanCategoria.className = 'canal-categoria';
+      spanCategoria.textContent = canal.categoria;
+      info.appendChild(spanCategoria);
+    }
+
+    boton.appendChild(info);
+
+    if (!canal.secure) {
+      const aviso = document.createElement('span');
+      aviso.className = 'canal-aviso';
+      aviso.textContent = 'Enlace no seguro';
+      boton.appendChild(aviso);
+    }
+
+    boton.addEventListener('click', () => {
+      reproducirCanal(canal.streamUrl, canal.nombre);
+    });
+
+    li.appendChild(boton);
+    lista.appendChild(li);
+  });
+
+  sidebar.appendChild(lista);
+  marcarCanalActivo();
+}
+
+// --- Reproductor de TV fijo ---
+
+function setEstadoTv(estado) {
+  if (!reproductorTvEls) return;
+  const textos = {
+    conectando: 'Conectando...',
+    reproduciendo: 'Reproduciendo',
+    error: 'Este canal no responde o no permite reproducirse desde el navegador',
+  };
+  reproductorTvEls.estado.textContent = textos[estado] || '';
+  reproductorTvEls.contenedor.dataset.estado = estado;
+}
+
+function actualizarBotonPausaTv() {
+  if (!reproductorTvEls) return;
+  const pausado = !videoActual || videoActual.paused;
+  reproductorTvEls.btnPausa.textContent = pausado ? '▶' : '⏸';
+  reproductorTvEls.btnPausa.setAttribute('aria-label', pausado ? 'Reanudar' : 'Pausar');
+}
+
+function actualizarBotonSilencioTv() {
+  if (!reproductorTvEls) return;
+  const mudo = !!(videoActual && videoActual.muted);
+  reproductorTvEls.btnMute.textContent = mudo ? '🔇' : '🔊';
+  reproductorTvEls.btnMute.setAttribute('aria-label', mudo ? 'Activar sonido' : 'Silenciar');
+  reproductorTvEls.btnMute.setAttribute('aria-pressed', mudo ? 'true' : 'false');
+}
+
+// Marca en la lista el canal que está sonando (por URL del stream).
+function marcarCanalActivo() {
+  document.querySelectorAll('.canales .canal').forEach((li) => {
+    const activo = !!(canalActual && li.dataset.url === canalActual.url);
+    li.classList.toggle('activa', activo);
+    const boton = li.querySelector('.canal-boton');
+    if (boton) boton.setAttribute('aria-current', activo ? 'true' : 'false');
+  });
+}
+
+function alternarPausaTv() {
+  if (!videoActual || !canalActual) return;
+  if (videoActual.paused) {
+    setEstadoTv('conectando');
+    intentarReproducirVideo(videoActual);
+  } else {
+    videoActual.pause();
+  }
+  actualizarBotonPausaTv();
+}
+
+function alternarSilencioTv() {
+  if (!videoActual) return;
+  videoActual.muted = !videoActual.muted;
+  actualizarBotonSilencioTv();
+}
+
+function alternarPantallaCompleta() {
+  if (!reproductorTvEls) return;
+  const contenedor = reproductorTvEls.contenedor;
+
+  // Se alterna sobre el contenedor para que los controles sigan visibles.
+  if (document.fullscreenElement === contenedor) {
+    if (typeof document.exitFullscreen === 'function') {
+      document.exitFullscreen();
+    }
+    return;
+  }
+
+  if (typeof contenedor.requestFullscreen !== 'function') return;
+  contenedor.requestFullscreen().catch(() => {
+    // Si el navegador rechaza la petición, no se cambia el estado.
+  });
+}
+
+// Carga hls.js bajo demanda: no pesa en la carga inicial de la página.
+async function cargarHls() {
+  if (!HlsClase) {
+    const modulo = await import('hls.js');
+    HlsClase = modulo.default || modulo;
+  }
+  return HlsClase;
+}
+
+// Construye una sola vez el reproductor de TV.
+function crearReproductorTv() {
+  if (reproductorTvEls) return;
+
+  const contenedor = document.createElement('section');
+  contenedor.id = 'tv-player';
+  contenedor.className = 'reproductor reproductor--tv';
+  contenedor.hidden = true; // Oculto hasta que haya un canal.
+  contenedor.setAttribute('aria-label', 'Reproductor de TV');
+
+  const pantalla = document.createElement('div');
+  pantalla.className = 'tv-pantalla';
+
+  const info = document.createElement('div');
+  info.className = 'reproductor-info';
+
+  const nombre = document.createElement('span');
+  nombre.className = 'reproductor-nombre';
+
+  const estado = document.createElement('span');
+  estado.className = 'reproductor-estado';
+  estado.setAttribute('aria-live', 'polite');
+
+  const controles = document.createElement('div');
+  controles.className = 'reproductor-controles';
+
+  const btnPausa = document.createElement('button');
+  btnPausa.type = 'button';
+  btnPausa.className = 'btn-control';
+  btnPausa.setAttribute('aria-label', 'Pausar');
+  btnPausa.textContent = '⏸';
+  btnPausa.addEventListener('click', alternarPausaTv);
+
+  const btnMute = document.createElement('button');
+  btnMute.type = 'button';
+  btnMute.className = 'btn-control';
+  btnMute.setAttribute('aria-label', 'Silenciar');
+  btnMute.setAttribute('aria-pressed', 'false');
+  btnMute.textContent = '🔊';
+  btnMute.addEventListener('click', alternarSilencioTv);
+
+  const volumen = document.createElement('input');
+  volumen.type = 'range';
+  volumen.className = 'volumen';
+  volumen.min = '0';
+  volumen.max = '1';
+  volumen.step = '0.01';
+  volumen.value = String(volumenRecordado);
+  volumen.setAttribute('aria-label', 'Volumen');
+  volumen.addEventListener('input', () => {
+    volumenRecordado = Number(volumen.value);
+    if (videoActual) videoActual.volume = volumenRecordado;
+    if (audioActual) audioActual.volume = volumenRecordado;
+    guardarVolumen(volumenRecordado);
+  });
+
+  const btnPantalla = document.createElement('button');
+  btnPantalla.type = 'button';
+  btnPantalla.className = 'btn-control';
+  btnPantalla.setAttribute('aria-label', 'Pantalla completa');
+  btnPantalla.textContent = '⛶';
+  btnPantalla.addEventListener('click', alternarPantallaCompleta);
+
+  const btnDetener = document.createElement('button');
+  btnDetener.type = 'button';
+  btnDetener.className = 'btn-control';
+  btnDetener.setAttribute('aria-label', 'Detener');
+  btnDetener.textContent = '⏹';
+  btnDetener.addEventListener('click', detenerTv);
+
+  info.appendChild(nombre);
+  info.appendChild(estado);
+  controles.appendChild(btnPausa);
+  controles.appendChild(btnMute);
+  controles.appendChild(volumen);
+  controles.appendChild(btnPantalla);
+  controles.appendChild(btnDetener);
+  contenedor.appendChild(pantalla);
+  contenedor.appendChild(info);
+  contenedor.appendChild(controles);
+  document.body.appendChild(contenedor);
+
+  // Refleja el estado real de pantalla completa en el aria-label.
+  document.addEventListener('fullscreenchange', () => {
+    const activa = document.fullscreenElement === contenedor;
+    btnPantalla.setAttribute(
+      'aria-label',
+      activa ? 'Salir de pantalla completa' : 'Pantalla completa'
+    );
+  });
+
+  reproductorTvEls = {
+    contenedor,
+    pantalla,
+    nombre,
+    estado,
+    btnPausa,
+    btnMute,
+    volumen,
+    btnPantalla,
+    btnDetener,
+  };
+}
+
+// Libera hls.js y el <video> actual sin tocar la visibilidad del reproductor.
+function limpiarReproductorTv() {
+  if (hlsActual) {
+    // destroy() detiene descargas y elimina los listeners internos.
+    hlsActual.destroy();
+    hlsActual = null;
+  }
+
+  if (videoActual) {
+    const video = videoActual;
+    videoActual = null;
+    video.pause();
+    video.removeAttribute('src');
+    video.load();
+    if (video.parentNode) video.parentNode.removeChild(video);
+  }
+
+  canalActual = null;
+  marcarCanalActivo();
+}
+
+function detenerTv() {
+  intentoTv += 1; // Invalida cualquier arranque asíncrono pendiente.
+
+  // No dejar el navegador en pantalla completa sobre un reproductor oculto.
+  if (
+    reproductorTvEls &&
+    document.fullscreenElement === reproductorTvEls.contenedor &&
+    typeof document.exitFullscreen === 'function'
+  ) {
+    document.exitFullscreen();
+  }
+
+  limpiarReproductorTv();
+
+  if (reproductorTvEls) {
+    reproductorTvEls.contenedor.hidden = true;
+    setEstadoTv('inactivo');
+  }
+}
+
+function intentarReproducirVideo(video) {
+  const intento = video.play();
+  if (intento !== undefined) {
+    intento.catch((e) => {
+      if (video !== videoActual) return;
+      // AbortError: pausa o cambio de canal mientras cargaba.
+      if (e && e.name === 'AbortError') return;
+      setEstadoTv('error');
+      actualizarBotonPausaTv();
+    });
+  }
+}
+
+/**
+ * Reproduce un canal de TV.
+ * Orden: hls.js si está soportado; si no, HLS nativo; si no, error claro.
+ * @param {string} streamUrl - URL del stream
+ * @param {string} nombre - Nombre del canal
+ */
+async function reproducirCanal(streamUrl, nombre) {
+  crearReproductorTv();
+  detenerAudio(); // Solo un reproductor activo a la vez.
+
+  limpiarReproductorTv();
+  const intento = ++intentoTv;
+
+  canalActual = { nombre, url: streamUrl };
+  reproductorTvEls.contenedor.hidden = false;
+  reproductorTvEls.nombre.textContent = nombre;
+  setEstadoTv('conectando');
+  marcarCanalActivo();
+
+  const video = document.createElement('video');
+  video.className = 'tv-video';
+  video.playsInline = true;
+  video.volume = volumenRecordado;
+  video.muted = false;
+  reproductorTvEls.pantalla.appendChild(video);
+  videoActual = video;
+
+  // Solo actualizar la UI si este video sigue siendo el actual.
+  video.addEventListener('playing', () => {
+    if (video !== videoActual) return;
+    setEstadoTv('reproduciendo');
+    actualizarBotonPausaTv();
+  });
+
+  video.addEventListener('waiting', () => {
+    if (video !== videoActual) return;
+    if (!video.paused) setEstadoTv('conectando');
+  });
+
+  video.addEventListener('error', () => {
+    if (video !== videoActual) return;
+    setEstadoTv('error');
+    actualizarBotonPausaTv();
+  });
+
+  video.addEventListener('play', actualizarBotonPausaTv);
+  video.addEventListener('pause', actualizarBotonPausaTv);
+
+  actualizarBotonSilencioTv();
+  actualizarBotonPausaTv();
+
+  let Hls = null;
+  try {
+    Hls = await cargarHls();
+  } catch (e) {
+    console.error('No se pudo cargar hls.js:', e);
+  }
+
+  // Mientras se cargaba el módulo pudo cambiar el canal, detenerse o cambiarse de pestaña.
+  if (intento !== intentoTv) return;
+
+  if (Hls && Hls.isSupported()) {
+    const hls = new Hls();
+    hlsActual = hls;
+
+    hls.on(Hls.Events.ERROR, (evento, datos) => {
+      if (hls !== hlsActual) return;
+      if (!datos || !datos.fatal) return; // Los no fatales se recuperan solos.
+
+      // Error irrecuperable (red/media): estado claro y liberar la instancia.
+      setEstadoTv('error');
+      actualizarBotonPausaTv();
+      hls.destroy();
+      if (hlsActual === hls) hlsActual = null;
+    });
+
+    hls.on(Hls.Events.MANIFEST_PARSED, () => {
+      if (hls !== hlsActual) return;
+      intentarReproducirVideo(video);
+    });
+
+    hls.loadSource(streamUrl);
+    hls.attachMedia(video);
+    return;
+  }
+
+  if (video.canPlayType('application/vnd.apple.mpegurl')) {
+    video.src = streamUrl;
+    intentarReproducirVideo(video);
+    return;
+  }
+
+  setEstadoTv('error');
+}
+
 // --- Eventos del toolbar ---
 
 function setupToolbar() {
@@ -543,23 +1035,45 @@ function setupToolbar() {
       modoActual = tab;
       
       if (tab === 'tv') {
-        // Mostrar "Próximamente" y detener audio
-        actualizarPanel(selectedFeature?.properties, { tv: true });
+        // Detener lo que suene y cancelar la carga de radio en curso.
         detenerAudio();
-        // Limpiar el contenido de emisoras si había
-        const codigo = document.getElementById('country-code');
-        codigo.textContent = 'Próximamente';
-        codigo.style.color = '#aaa';
-      } else if (tab === 'radio') {
-        // Si hay un país seleccionado, recargar radio de ese país
-        if (selectedFeature) {
-          const iso2 = getIso2(selectedFeature.properties);
+        detenerTv();
+        if (controladorAbort) controladorAbort.abort();
+
+        const feature = selectedFeature;
+        if (!feature) {
+          const codigo = document.getElementById('country-code');
+          codigo.textContent = 'Selecciona un país para ver canales de TV';
+          codigo.style.color = '#aaa';
+        } else {
+          const iso2 = getIso2(feature.properties);
           if (iso2) {
-            cargarRadio(iso2).then(datos => {
-              actualizarPanel(selectedFeature.properties, datos);
+            actualizarPanelTv(feature.properties, { loading: true });
+            cargarTv(iso2).then((datos) => {
+              // Descartar respuestas si el usuario cambió de pestaña o de país.
+              if (modoActual !== 'tv' || selectedFeature !== feature) return;
+              actualizarPanelTv(feature.properties, datos);
             });
           } else {
-            actualizarPanel(selectedFeature.properties, { sinCodigo: true });
+            actualizarPanelTv(feature.properties, null);
+          }
+        }
+      } else if (tab === 'radio') {
+        // Al volver a radio, cortar la TV y su carga pendiente.
+        detenerTv();
+        if (controladorTv) controladorTv.abort();
+
+        // Si hay un país seleccionado, recargar radio de ese país
+        if (selectedFeature) {
+          const feature = selectedFeature;
+          const iso2 = getIso2(feature.properties);
+          if (iso2) {
+            cargarRadio(iso2).then(datos => {
+              if (modoActual !== 'radio' || selectedFeature !== feature) return;
+              actualizarPanel(feature.properties, datos);
+            });
+          } else {
+            actualizarPanel(feature.properties, { sinCodigo: true });
           }
         } else {
           // Si no hay país seleccionado, limpiar panel
@@ -609,11 +1123,27 @@ function handleCountryClick(feature) {
   globe.pointOfView({ lat: centro.lat, lng: centro.lng, altitude: 1.6 }, 1000);
 
   const iso2 = getIso2(feature.properties);
-  modoActual = 'radio'; // Siempre empezar en radio al hacer clic en un país
-  
+
+  // La pestaña activa decide qué módulo cargar; ya no se fuerza radio.
+  if (modoActual === 'tv') {
+    if (iso2) {
+      actualizarPanelTv(feature.properties, { loading: true });
+      cargarTv(iso2).then((datos) => {
+        // Descartar respuestas si cambió la pestaña o el país seleccionado.
+        if (modoActual !== 'tv' || selectedFeature !== feature) return;
+        actualizarPanelTv(feature.properties, datos);
+      });
+    } else {
+      // País sin código: mostrar mensaje y no llamar a API
+      actualizarPanelTv(feature.properties, null);
+    }
+    return;
+  }
+
   if (iso2) {
     // Cargar radio para este país
     cargarRadio(iso2).then(datos => {
+      if (modoActual !== 'radio' || selectedFeature !== feature) return;
       actualizarPanel(feature.properties, datos);
     });
   } else {
@@ -689,6 +1219,7 @@ function configurarControles() {
 async function init() {
   await initGlobe();
   crearReproductor();
+  crearReproductorTv();
   setupToolbar();
   
   // Verificar que la variable de entorno esté configurada
