@@ -17,6 +17,13 @@
   <nav id="toolbar">
     <button class="tab-btn active" data-tab="radio">Radio</button>
     <button class="tab-btn" data-tab="tv">TV</button>
+    <button id="btn-favoritos" class="tab-btn accion-btn" type="button" aria-pressed="false">Mis favoritos</button>
+    <div id="cuenta" class="cuenta">
+      <button id="btn-cuenta" class="tab-btn cuenta-btn" type="button" aria-haspopup="menu" aria-expanded="false">Entrar</button>
+      <div id="menu-cuenta" class="cuenta-menu" role="menu" hidden>
+        <button id="btn-salir" class="cuenta-salir" type="button" role="menuitem">Salir</button>
+      </div>
+    </div>
   </nav>
   <script type="module" src="/main.js"></script>
 </body>

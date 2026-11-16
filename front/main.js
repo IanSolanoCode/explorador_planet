@@ -30,6 +30,24 @@ let reproductorTvEls = null;
 let intentoTv = 0; // invalida arranques asíncronos antiguos (import de hls.js)
 let HlsClase = null; // módulo hls.js cargado bajo demanda
 
+// --- Sesión y favoritos ---
+// El token solo se guarda en localStorage (con try/catch) y se envía como Bearer.
+const TOKEN_CLAVE = 'explorador-planet:token';
+let token = leerToken();
+let usuarioActual = null;
+// Clave `${type}:${itemId}` -> favorito de la API (su valor incluye el id numérico).
+let favoritos = new Map();
+let versionSesion = 0; // invalida respuestas de favoritos de una sesión anterior
+let controladorFavoritos = null;
+let peticionFavoritosActual = 0;
+let vistaFavoritos = false;
+let modalAuthEls = null;
+let modoAuth = 'login';
+let ultimoFocoModal = null;
+let avisoTimer = null;
+// Asocia cada corazón con su item para poder actualizarlo sin re-renderizar listas.
+const itemsBotonFavorito = new WeakMap();
+
 // Volumen recordado entre visitas: 0–1, con 0.7 por defecto.
 const VOLUMEN_CLAVE = 'explorador-planet:volumen';
 const VOLUMEN_POR_DEFECTO = 0.7;
@@ -49,6 +67,16 @@ function getIso2(props) {
 
 function getName(props) {
   return props.ADMIN || 'País desconocido';
+}
+
+// Normaliza un país a ISO-2 en mayúsculas. Si el item no trae un código
+// válido, usa el país seleccionado como respaldo y, si tampoco sirve, ''.
+function normalizarCountry(valor, respaldo = '') {
+  const propio = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
+  if (/^[A-Z]{2}$/.test(propio)) return propio;
+
+  const alterno = typeof respaldo === 'string' ? respaldo.trim().toUpperCase() : '';
+  return /^[A-Z]{2}$/.test(alterno) ? alterno : '';
 }
 
 // --- Estilos del globe.gl ---
@@ -125,6 +153,17 @@ function actualizarPanel(props, datosRadio = null) {
         const nombreOriginal = est.nombre;
         const nombreCorto = nombreOriginal.split(' - ')[0];
         const url = est.streamUrl || est.url;
+
+        // Datos exactos que necesita POST /favorites. El país se toma del
+        // item y, si no es válido, del país que se está viendo.
+        const item = {
+          type: 'radio',
+          itemId: est.id,
+          name: nombreCorto,
+          country: normalizarCountry(est.country, iso2),
+          streamUrl: url,
+          logo: est.logo || '',
+        };
         
         // Botón real: accesible por teclado y con foco visible.
         const boton = document.createElement('button');
@@ -146,6 +185,11 @@ function actualizarPanel(props, datosRadio = null) {
         });
 
         li.appendChild(boton);
+
+        // El corazón solo se añade si la API dio un id real para el item.
+        const corazon = crearBotonFavorito(item);
+        if (corazon) li.appendChild(corazon);
+
         lista.appendChild(li);
       });
       
@@ -202,8 +246,12 @@ async function cargarRadio(iso2) {
     
     const estaciones = data.data;
     
-    // Normalizar estaciones al formato esperado
+    // Normalizar estaciones al formato esperado.
+    // `id` y `country` se conservan para poder crear el favorito con su
+    // identidad real; no se inventan valores si la API no los envía.
     const emisoras = estaciones.map(st => ({
+      id: st.id != null ? String(st.id) : '',
+      country: normalizarCountry(st.country, iso2),
       nombre: st.name || 'Sin nombre',
       streamUrl: st.streamUrl || st.url || '',
       logo: st.logo || '',
@@ -397,7 +445,7 @@ function actualizarBotonSilencio() {
 // Marca en la lista la emisora que está sonando (por URL del stream).
 // Se limita a la lista de radio: la de TV reutiliza clases de tarjeta.
 function marcarEmisoraActiva() {
-  document.querySelectorAll('.emisoras:not(.canales) .emisora').forEach((li) => {
+  document.querySelectorAll('.emisoras:not(.canales):not(.favoritos) .emisora').forEach((li) => {
     const activa = !!(emisoraActual && li.dataset.url === emisoraActual.url);
     li.classList.toggle('activa', activa);
     const boton = li.querySelector('.emisora-boton');
@@ -561,6 +609,10 @@ async function cargarTv(iso2) {
     const canales = data.data
       .filter((canal) => canal && canal.streamUrl)
       .map((canal) => ({
+        // Se conserva el id y se toma el país del propio canal, con respaldo
+        // en el código del país seleccionado.
+        id: canal.id != null ? String(canal.id) : '',
+        country: normalizarCountry(canal.country, iso2),
         nombre: canal.name || 'Sin nombre',
         streamUrl: canal.streamUrl,
         logo: canal.logo || '',
@@ -639,6 +691,17 @@ function actualizarPanelTv(props, datos = null) {
     li.className = 'emisora canal';
     li.dataset.url = canal.streamUrl;
 
+    // Datos exactos para crear el favorito; el país ya viene normalizado
+    // desde cargarTv (item primero, país seleccionado como respaldo).
+    const item = {
+      type: 'tv',
+      itemId: canal.id,
+      name: canal.nombre,
+      country: normalizarCountry(canal.country, iso2),
+      streamUrl: canal.streamUrl,
+      logo: canal.logo || '',
+    };
+
     const boton = document.createElement('button');
     boton.type = 'button';
     boton.className = 'emisora-boton canal-boton';
@@ -676,6 +739,11 @@ function actualizarPanelTv(props, datos = null) {
     });
 
     li.appendChild(boton);
+
+    // El corazón solo se añade si la API dio un id real para el canal.
+    const corazon = crearBotonFavorito(item);
+    if (corazon) li.appendChild(corazon);
+
     lista.appendChild(li);
   });
 
@@ -1018,10 +1086,945 @@ async function reproducirCanal(streamUrl, nombre) {
   setEstadoTv('error');
 }
 
+// --- Cuentas y favoritos ---
+
+function leerToken() {
+  try {
+    return localStorage.getItem(TOKEN_CLAVE) || '';
+  } catch {
+    // localStorage puede fallar en modo privado: se usa una sesión solo en memoria.
+    return '';
+  }
+}
+
+function guardarToken(nuevoToken) {
+  token = typeof nuevoToken === 'string' ? nuevoToken : '';
+  try {
+    if (token) {
+      localStorage.setItem(TOKEN_CLAVE, token);
+    } else {
+      localStorage.removeItem(TOKEN_CLAVE);
+    }
+  } catch {
+    // Si no se puede persistir, la sesión sigue funcionando en esta pestaña.
+  }
+}
+
+function borrarToken() {
+  token = '';
+  try {
+    localStorage.removeItem(TOKEN_CLAVE);
+  } catch {
+    // El token en memoria ya se borró; no hay nada más que hacer.
+  }
+}
+
+function claveFavorito(tipo, itemId) {
+  return `${tipo}:${itemId != null ? String(itemId) : ''}`;
+}
+
+function paisSeleccionadoIso2() {
+  if (!selectedFeature || !selectedFeature.properties) return '';
+  return getIso2(selectedFeature.properties);
+}
+
+/**
+ * Petición central a la API.
+ * - Añade el token solo cuando corresponde.
+ * - Devuelve un resultado normalizado, también para fallos de red o abortos.
+ * - Ante un 401 autenticado, cierra la sesión local y avisa (salvo que se pida
+ *   manejar401: false, como en la validación silenciosa del arranque).
+ */
+async function peticionApi(ruta, opciones = {}) {
+  const {
+    usarToken = true,
+    manejar401 = true,
+    headers: cabeceras = {},
+    ...opcionesFetch
+  } = opciones;
+
+  const headers = new Headers(cabeceras);
+  headers.set('Accept', 'application/json');
+  if (opcionesFetch.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const tokenEnvio = usarToken ? token : '';
+  if (tokenEnvio) headers.set('Authorization', `Bearer ${tokenEnvio}`);
+
+  let res;
+  try {
+    res = await fetch(`${API_BASE}${ruta}`, { ...opcionesFetch, headers });
+  } catch (e) {
+    if (e && e.name === 'AbortError') {
+      return { abortado: true, ok: false, status: 0, data: null };
+    }
+    return { red: true, ok: false, status: 0, data: null };
+  }
+
+  let data = null;
+  if (res.status !== 204) {
+    try {
+      const texto = await res.text();
+      if (texto) data = JSON.parse(texto);
+    } catch {
+      data = null;
+    }
+  }
+
+  // Solo se cierra la sesión si la petición usó el token que sigue vigente.
+  if (res.status === 401 && manejar401 && tokenEnvio && token === tokenEnvio) {
+    cerrarSesionLocal({ aviso: 'Tu sesión terminó, vuelve a entrar.' });
+  }
+
+  return { ok: res.ok, status: res.status, data };
+}
+
+function mostrarAviso(texto) {
+  if (!texto) return;
+
+  let aviso = document.getElementById('aviso-global');
+  if (!aviso) {
+    aviso = document.createElement('div');
+    aviso.id = 'aviso-global';
+    aviso.className = 'aviso-global';
+    aviso.setAttribute('role', 'status');
+    aviso.setAttribute('aria-live', 'polite');
+    document.body.appendChild(aviso);
+  }
+
+  aviso.textContent = texto;
+  aviso.hidden = false;
+
+  if (avisoTimer) clearTimeout(avisoTimer);
+  avisoTimer = setTimeout(() => {
+    aviso.hidden = true;
+    aviso.textContent = '';
+    avisoTimer = null;
+  }, 5000);
+}
+
+function actualizarBotonCuenta() {
+  const boton = document.getElementById('btn-cuenta');
+  const menu = document.getElementById('menu-cuenta');
+  if (!boton) return;
+
+  if (usuarioActual) {
+    const nombre = usuarioActual.name || 'Mi cuenta';
+    boton.textContent = nombre;
+    boton.setAttribute('aria-label', `Cuenta de ${nombre}`);
+  } else {
+    boton.textContent = 'Entrar';
+    boton.setAttribute('aria-label', 'Entrar');
+    if (menu) menu.hidden = true;
+  }
+
+  if (menu) {
+    boton.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+  }
+}
+
+function setupCuenta() {
+  const boton = document.getElementById('btn-cuenta');
+  const menu = document.getElementById('menu-cuenta');
+  const botonSalir = document.getElementById('btn-salir');
+  const contenedor = document.getElementById('cuenta');
+
+  if (boton) {
+    boton.addEventListener('click', (evento) => {
+      evento.stopPropagation();
+      if (!usuarioActual) {
+        abrirModalAuth('login');
+        return;
+      }
+      if (!menu) return;
+      menu.hidden = !menu.hidden;
+      boton.setAttribute('aria-expanded', menu.hidden ? 'false' : 'true');
+    });
+  }
+
+  if (botonSalir) {
+    botonSalir.addEventListener('click', (evento) => {
+      evento.stopPropagation();
+      cerrarSesionRemota();
+    });
+  }
+
+  if (contenedor) {
+    document.addEventListener('click', (evento) => {
+      if (!menu || menu.hidden) return;
+      if (!contenedor.contains(evento.target)) {
+        menu.hidden = true;
+        if (boton) boton.setAttribute('aria-expanded', 'false');
+      }
+    });
+  }
+
+  actualizarBotonCuenta();
+}
+
+function marcarVistaFavoritos(activa) {
+  vistaFavoritos = !!activa;
+  const boton = document.getElementById('btn-favoritos');
+  if (!boton) return;
+  boton.classList.toggle('activo', vistaFavoritos);
+  boton.setAttribute('aria-pressed', vistaFavoritos ? 'true' : 'false');
+}
+
+function setupFavoritos() {
+  const boton = document.getElementById('btn-favoritos');
+  if (boton) boton.addEventListener('click', mostrarFavoritos);
+  marcarVistaFavoritos(false);
+}
+
+// Invalida respuestas de favoritos en curso. Se usa al cerrar sesión para que
+// una petición lenta no vuelva a pintar corazones de una sesión ya cerrada.
+function invalidarPeticionesFavoritos() {
+  versionSesion += 1;
+  peticionFavoritosActual += 1;
+  if (controladorFavoritos) {
+    controladorFavoritos.abort();
+    controladorFavoritos = null;
+  }
+}
+
+async function cerrarSesionRemota() {
+  const botonSalir = document.getElementById('btn-salir');
+  if (botonSalir) botonSalir.disabled = true;
+
+  // Se invalida desde el primer momento, antes de esperar al servidor.
+  invalidarPeticionesFavoritos();
+
+  try {
+    if (token) {
+      // Aunque falle la petición, la sesión local se cierra en el finally.
+      await peticionApi('/auth/logout', { method: 'POST', manejar401: false });
+    }
+  } finally {
+    cerrarSesionLocal();
+    if (botonSalir) botonSalir.disabled = false;
+  }
+}
+
+function cerrarSesionLocal({ aviso = '' } = {}) {
+  invalidarPeticionesFavoritos();
+
+  borrarToken();
+  usuarioActual = null;
+  favoritos.clear();
+
+  actualizarBotonCuenta();
+  actualizarCorazonesVisibles();
+  if (vistaFavoritos) renderFavoritosPanel({ sinSesion: true });
+  if (aviso) mostrarAviso(aviso);
+}
+
+async function inicializarSesion() {
+  actualizarBotonCuenta();
+  if (!token) return;
+
+  const version = versionSesion;
+  // Silencioso a propósito: un token caducado al arrancar solo se descarta.
+  const res = await peticionApi('/auth/me', { manejar401: false });
+  if (version !== versionSesion) return;
+
+  if (res.status === 401) {
+    cerrarSesionLocal();
+    return;
+  }
+
+  if (res.ok && res.data && res.data.data) {
+    usuarioActual = res.data.data;
+    actualizarBotonCuenta();
+    actualizarCorazonesVisibles();
+    await cargarFavoritos({ renderPanel: vistaFavoritos });
+  }
+}
+
+// --- Modal de autenticación ---
+
+function crearCampoAuth({ id, nombre, etiqueta, tipo = 'text', autocomplete }) {
+  const contenedor = document.createElement('div');
+  contenedor.className = 'auth-campo';
+
+  const label = document.createElement('label');
+  label.htmlFor = id;
+  label.textContent = etiqueta;
+
+  const input = document.createElement('input');
+  input.id = id;
+  input.name = nombre;
+  input.type = tipo;
+  input.autocomplete = autocomplete;
+  input.setAttribute('aria-describedby', `${id}-error`);
+
+  const error = document.createElement('p');
+  error.id = `${id}-error`;
+  error.className = 'auth-error';
+  error.setAttribute('aria-live', 'polite');
+
+  contenedor.appendChild(label);
+  contenedor.appendChild(input);
+  contenedor.appendChild(error);
+
+  return { contenedor, input, error };
+}
+
+function crearModalAuth() {
+  if (modalAuthEls) return modalAuthEls;
+
+  const fondo = document.createElement('div');
+  fondo.className = 'modal-auth';
+  fondo.hidden = true;
+
+  const dialogo = document.createElement('div');
+  dialogo.className = 'modal-auth__dialog';
+  dialogo.setAttribute('role', 'dialog');
+  dialogo.setAttribute('aria-modal', 'true');
+  dialogo.setAttribute('aria-labelledby', 'auth-titulo');
+
+  const cerrar = document.createElement('button');
+  cerrar.type = 'button';
+  cerrar.className = 'modal-auth__cerrar';
+  cerrar.setAttribute('aria-label', 'Cerrar');
+  cerrar.textContent = '×';
+  cerrar.addEventListener('click', cerrarModalAuth);
+
+  const titulo = document.createElement('h2');
+  titulo.id = 'auth-titulo';
+  titulo.className = 'modal-auth__titulo';
+  titulo.textContent = 'Iniciar sesión';
+
+  const tabs = document.createElement('div');
+  tabs.className = 'auth-tabs';
+
+  const tabLogin = document.createElement('button');
+  tabLogin.type = 'button';
+  tabLogin.className = 'auth-tab activo';
+  tabLogin.textContent = 'Iniciar sesión';
+  tabLogin.setAttribute('aria-pressed', 'true');
+  tabLogin.addEventListener('click', () => aplicarModoAuth('login'));
+
+  const tabRegistro = document.createElement('button');
+  tabRegistro.type = 'button';
+  tabRegistro.className = 'auth-tab';
+  tabRegistro.textContent = 'Crear cuenta';
+  tabRegistro.setAttribute('aria-pressed', 'false');
+  tabRegistro.addEventListener('click', () => aplicarModoAuth('registro'));
+
+  tabs.appendChild(tabLogin);
+  tabs.appendChild(tabRegistro);
+
+  const form = document.createElement('form');
+  form.className = 'auth-form';
+  form.noValidate = true;
+
+  const nombre = crearCampoAuth({
+    id: 'auth-nombre',
+    nombre: 'name',
+    etiqueta: 'Nombre',
+    autocomplete: 'name',
+  });
+  const email = crearCampoAuth({
+    id: 'auth-email',
+    nombre: 'email',
+    etiqueta: 'Correo',
+    tipo: 'email',
+    autocomplete: 'email',
+  });
+  const password = crearCampoAuth({
+    id: 'auth-password',
+    nombre: 'password',
+    etiqueta: 'Contraseña',
+    tipo: 'password',
+    autocomplete: 'current-password',
+  });
+  const confirmacion = crearCampoAuth({
+    id: 'auth-password-confirmation',
+    nombre: 'password_confirmation',
+    etiqueta: 'Confirmar contraseña',
+    tipo: 'password',
+    autocomplete: 'new-password',
+  });
+
+  nombre.contenedor.hidden = true;
+  confirmacion.contenedor.hidden = true;
+
+  const mensaje = document.createElement('p');
+  mensaje.className = 'auth-mensaje';
+  mensaje.setAttribute('role', 'alert');
+  mensaje.setAttribute('aria-live', 'assertive');
+  mensaje.hidden = true;
+
+  const acciones = document.createElement('div');
+  acciones.className = 'auth-acciones';
+
+  const submit = document.createElement('button');
+  submit.type = 'submit';
+  submit.className = 'auth-submit';
+  submit.textContent = 'Entrar';
+
+  acciones.appendChild(submit);
+
+  form.appendChild(nombre.contenedor);
+  form.appendChild(email.contenedor);
+  form.appendChild(password.contenedor);
+  form.appendChild(confirmacion.contenedor);
+  form.appendChild(mensaje);
+  form.appendChild(acciones);
+
+  form.addEventListener('submit', enviarFormularioAuth);
+
+  dialogo.appendChild(cerrar);
+  dialogo.appendChild(titulo);
+  dialogo.appendChild(tabs);
+  dialogo.appendChild(form);
+  fondo.appendChild(dialogo);
+  document.body.appendChild(fondo);
+
+  fondo.addEventListener('click', (evento) => {
+    if (evento.target === fondo) cerrarModalAuth();
+  });
+
+  document.addEventListener('keydown', manejarTeclaModal);
+
+  modalAuthEls = {
+    fondo,
+    dialogo,
+    titulo,
+    tabs: { login: tabLogin, registro: tabRegistro },
+    form,
+    campos: { nombre, email, password, confirmacion },
+    mensaje,
+    submit,
+  };
+
+  return modalAuthEls;
+}
+
+function limpiarErroresAuth() {
+  if (!modalAuthEls) return;
+  Object.values(modalAuthEls.campos).forEach((campo) => {
+    campo.error.textContent = '';
+    campo.input.removeAttribute('aria-invalid');
+  });
+  modalAuthEls.mensaje.textContent = '';
+  modalAuthEls.mensaje.hidden = true;
+}
+
+function mostrarMensajeAuth(texto) {
+  if (!modalAuthEls) return;
+  modalAuthEls.mensaje.textContent = texto || '';
+  modalAuthEls.mensaje.hidden = !texto;
+}
+
+function mostrarErroresAuth(errors) {
+  if (!modalAuthEls) return null;
+
+  const mapa = {
+    name: modalAuthEls.campos.nombre,
+    email: modalAuthEls.campos.email,
+    password: modalAuthEls.campos.password,
+    password_confirmation: modalAuthEls.campos.confirmacion,
+  };
+
+  let primerCampo = null;
+  Object.entries(mapa).forEach(([nombre, campo]) => {
+    const lista = errors && Array.isArray(errors[nombre]) ? errors[nombre] : [];
+    const texto = lista.length ? lista.map(String).join(' ') : '';
+    campo.error.textContent = texto;
+    if (texto) {
+      campo.input.setAttribute('aria-invalid', 'true');
+      if (!primerCampo) primerCampo = campo.input;
+    } else {
+      campo.input.removeAttribute('aria-invalid');
+    }
+  });
+
+  const otros = errors && typeof errors === 'object' ? Object.keys(errors) : [];
+  const desconocido = otros.find((nombre) => !Object.prototype.hasOwnProperty.call(mapa, nombre));
+  if (desconocido) {
+    const lista = Array.isArray(errors[desconocido]) ? errors[desconocido] : [];
+    if (lista.length) mostrarMensajeAuth(String(lista[0]));
+  }
+
+  return primerCampo;
+}
+
+function aplicarModoAuth(modo) {
+  if (!modalAuthEls) return;
+
+  modoAuth = modo === 'registro' ? 'registro' : 'login';
+  const esRegistro = modoAuth === 'registro';
+  const { campos, tabs, titulo, submit } = modalAuthEls;
+
+  campos.nombre.contenedor.hidden = !esRegistro;
+  campos.confirmacion.contenedor.hidden = !esRegistro;
+  campos.password.input.autocomplete = esRegistro ? 'new-password' : 'current-password';
+
+  tabs.login.classList.toggle('activo', !esRegistro);
+  tabs.registro.classList.toggle('activo', esRegistro);
+  tabs.login.setAttribute('aria-pressed', esRegistro ? 'false' : 'true');
+  tabs.registro.setAttribute('aria-pressed', esRegistro ? 'true' : 'false');
+
+  titulo.textContent = esRegistro ? 'Crear cuenta' : 'Iniciar sesión';
+  submit.textContent = esRegistro ? 'Crear cuenta' : 'Entrar';
+
+  limpiarErroresAuth();
+  campos.password.input.value = '';
+  campos.confirmacion.input.value = '';
+
+  const primerCampo = esRegistro ? campos.nombre.input : campos.email.input;
+  primerCampo.focus();
+}
+
+function abrirModalAuth(modo = 'login') {
+  crearModalAuth();
+  if (modalAuthEls.fondo.hidden) {
+    ultimoFocoModal = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  }
+  modalAuthEls.fondo.hidden = false;
+  aplicarModoAuth(modo);
+}
+
+function cerrarModalAuth() {
+  if (!modalAuthEls || modalAuthEls.fondo.hidden) return;
+
+  modalAuthEls.fondo.hidden = true;
+  limpiarErroresAuth();
+  modalAuthEls.campos.password.input.value = '';
+  modalAuthEls.campos.confirmacion.input.value = '';
+
+  if (ultimoFocoModal && document.contains(ultimoFocoModal)) {
+    ultimoFocoModal.focus();
+  }
+  ultimoFocoModal = null;
+}
+
+function obtenerEnfocablesModal() {
+  if (!modalAuthEls) return [];
+  const selector = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])';
+  return Array.from(modalAuthEls.dialogo.querySelectorAll(selector))
+    .filter((elemento) => elemento.offsetParent !== null);
+}
+
+function manejarTeclaModal(evento) {
+  if (!modalAuthEls || modalAuthEls.fondo.hidden) return;
+
+  if (evento.key === 'Escape') {
+    evento.preventDefault();
+    cerrarModalAuth();
+    return;
+  }
+
+  if (evento.key !== 'Tab') return;
+
+  const enfocables = obtenerEnfocablesModal();
+  if (!enfocables.length) return;
+
+  const primero = enfocables[0];
+  const ultimo = enfocables[enfocables.length - 1];
+  if (evento.shiftKey && document.activeElement === primero) {
+    evento.preventDefault();
+    ultimo.focus();
+  } else if (!evento.shiftKey && document.activeElement === ultimo) {
+    evento.preventDefault();
+    primero.focus();
+  }
+}
+
+async function enviarFormularioAuth(evento) {
+  evento.preventDefault();
+  if (!modalAuthEls) return;
+
+  const { campos, submit } = modalAuthEls;
+  if (submit.disabled) return;
+
+  limpiarErroresAuth();
+  submit.disabled = true;
+  submit.setAttribute('aria-busy', 'true');
+  submit.textContent = 'Enviando...';
+
+  const datos = {
+    email: campos.email.input.value.trim(),
+    password: campos.password.input.value,
+  };
+  if (modoAuth === 'registro') {
+    datos.name = campos.nombre.input.value.trim();
+    datos.password_confirmation = campos.confirmacion.input.value;
+  }
+
+  try {
+    const res = await peticionApi(
+      modoAuth === 'registro' ? '/auth/register' : '/auth/login',
+      {
+        method: 'POST',
+        body: JSON.stringify(datos),
+        usarToken: false,
+        manejar401: false,
+      }
+    );
+
+    if (res.red) {
+      mostrarMensajeAuth('No se pudo conectar con el servidor. Revisa tu conexión e inténtalo de nuevo.');
+      return;
+    }
+
+    if (res.status === 429) {
+      mostrarMensajeAuth('Demasiados intentos, espera un minuto');
+      return;
+    }
+
+    if (res.status === 422) {
+      const primerCampo = mostrarErroresAuth(res.data ? res.data.errors : null);
+      if (primerCampo) {
+        primerCampo.focus();
+      } else {
+        mostrarMensajeAuth((res.data && res.data.message) || 'Revisa los datos e inténtalo de nuevo.');
+      }
+      return;
+    }
+
+    if (!res.ok) {
+      mostrarMensajeAuth((res.data && res.data.message) || 'No se pudo completar la solicitud. Inténtalo de nuevo.');
+      return;
+    }
+
+    const auth = res.data && res.data.data;
+    if (!auth || !auth.token || !auth.user) {
+      mostrarMensajeAuth('La respuesta del servidor no es válida. Inténtalo de nuevo.');
+      return;
+    }
+
+    guardarToken(auth.token);
+    usuarioActual = auth.user;
+    versionSesion += 1;
+    peticionFavoritosActual += 1;
+    actualizarBotonCuenta();
+    actualizarCorazonesVisibles();
+    cerrarModalAuth();
+
+    // La carga de favoritos no bloquea el cierre del modal.
+    cargarFavoritos({ renderPanel: vistaFavoritos });
+  } finally {
+    // Nunca conservar contraseñas en el DOM tras un intento.
+    campos.password.input.value = '';
+    campos.confirmacion.input.value = '';
+    submit.disabled = false;
+    submit.removeAttribute('aria-busy');
+    submit.textContent = modoAuth === 'registro' ? 'Crear cuenta' : 'Entrar';
+  }
+}
+
+// --- Favoritos ---
+
+function convertirFavoritoAItem(favorito) {
+  if (!favorito) return null;
+  if (favorito.type !== 'tv' && favorito.type !== 'radio') return null;
+  if (favorito.itemId == null) return null;
+
+  return {
+    type: favorito.type,
+    itemId: String(favorito.itemId),
+    name: favorito.name || 'Sin nombre',
+    country: normalizarCountry(favorito.country, paisSeleccionadoIso2()),
+    streamUrl: favorito.streamUrl || '',
+    logo: favorito.logo || '',
+  };
+}
+
+async function cargarFavoritos({ renderPanel = false } = {}) {
+  if (!usuarioActual || !token) {
+    if (renderPanel || vistaFavoritos) renderFavoritosPanel({ sinSesion: true });
+    return;
+  }
+
+  if (controladorFavoritos) controladorFavoritos.abort();
+  controladorFavoritos = new AbortController();
+  const controlador = controladorFavoritos;
+  const version = versionSesion;
+  const peticion = ++peticionFavoritosActual;
+
+  let res;
+  try {
+    res = await peticionApi('/favorites', { signal: controlador.signal });
+  } finally {
+    if (controladorFavoritos === controlador) controladorFavoritos = null;
+  }
+
+  // Una respuesta vieja o de otra sesión no debe tocar el estado actual.
+  if (res.abortado || peticion !== peticionFavoritosActual || version !== versionSesion || !usuarioActual) {
+    return;
+  }
+
+  if (!res.ok) {
+    if (renderPanel || vistaFavoritos) renderFavoritosPanel({ error: true });
+    return;
+  }
+
+  const lista = res.data && Array.isArray(res.data.data) ? res.data.data : [];
+  favoritos.clear();
+  lista.forEach((favorito) => {
+    if (!favorito || (favorito.type !== 'tv' && favorito.type !== 'radio')) return;
+    if (favorito.id == null || favorito.itemId == null) return;
+    favoritos.set(claveFavorito(favorito.type, String(favorito.itemId)), favorito);
+  });
+
+  actualizarCorazonesVisibles();
+  if (renderPanel || vistaFavoritos) {
+    renderFavoritosPanel({ lista: Array.from(favoritos.values()) });
+  }
+}
+
+function actualizarBotonFavorito(boton, item) {
+  if (!boton || !item || item.itemId == null) return;
+
+  const activo = Boolean(
+    usuarioActual && favoritos.has(claveFavorito(item.type, String(item.itemId)))
+  );
+  const nombre = item.name || 'este contenido';
+  boton.textContent = activo ? '♥' : '♡';
+  boton.classList.toggle('activo', activo);
+  boton.setAttribute('aria-pressed', activo ? 'true' : 'false');
+  boton.setAttribute('aria-label', activo ? `Quitar ${nombre} de favoritos` : `Añadir ${nombre} a favoritos`);
+  boton.title = activo ? 'Quitar de favoritos' : 'Añadir a favoritos';
+}
+
+function crearBotonFavorito(item) {
+  if (!item || item.itemId == null || item.itemId === '') return null;
+
+  const boton = document.createElement('button');
+  boton.type = 'button';
+  boton.className = 'btn-favorito';
+  itemsBotonFavorito.set(boton, item);
+
+  boton.addEventListener('click', (evento) => {
+    evento.preventDefault();
+    evento.stopPropagation();
+    alternarFavorito(item, boton);
+  });
+
+  actualizarBotonFavorito(boton, item);
+  return boton;
+}
+
+function actualizarCorazonesVisibles() {
+  document.querySelectorAll('.btn-favorito').forEach((boton) => {
+    const item = itemsBotonFavorito.get(boton);
+    if (item) actualizarBotonFavorito(boton, item);
+  });
+}
+
+async function alternarFavorito(item, boton) {
+  if (!usuarioActual) {
+    abrirModalAuth('login');
+    return;
+  }
+
+  if (!item || item.itemId == null || !boton || boton.disabled) return;
+
+  const tipo = item.type === 'tv' || item.type === 'radio' ? item.type : '';
+  const nombre = typeof item.name === 'string' ? item.name.trim() : '';
+  const itemId = String(item.itemId).trim();
+  const country = normalizarCountry(item.country, paisSeleccionadoIso2());
+  const streamUrl = typeof item.streamUrl === 'string' ? item.streamUrl : '';
+
+  if (!tipo || !itemId || !nombre || !country || !/^https?:\/\//i.test(streamUrl)) {
+    mostrarAviso('No se puede guardar este contenido como favorito.');
+    return;
+  }
+
+  const clave = claveFavorito(tipo, itemId);
+  const favorito = favoritos.get(clave);
+  const version = versionSesion;
+
+  boton.disabled = true;
+  try {
+    if (favorito) {
+      const res = await peticionApi(`/favorites/${encodeURIComponent(favorito.id)}`, {
+        method: 'DELETE',
+      });
+
+      if (version !== versionSesion || !usuarioActual) return;
+
+      if (res.ok || res.status === 404) {
+        favoritos.delete(clave);
+        actualizarBotonFavorito(boton, item);
+        if (res.status === 404) mostrarAviso('El favorito ya no existía.');
+      } else if (res.red) {
+        mostrarAviso('No se pudo conectar con el servidor. Inténtalo de nuevo.');
+      } else {
+        mostrarAviso((res.data && res.data.message) || 'No se pudo quitar el favorito.');
+      }
+      return;
+    }
+
+    const body = {
+      type: tipo,
+      itemId,
+      name: nombre,
+      country,
+      streamUrl,
+      logo: typeof item.logo === 'string' && /^https?:\/\//i.test(item.logo) ? item.logo : null,
+    };
+
+    const res = await peticionApi('/favorites', {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+
+    if (version !== versionSesion || !usuarioActual) return;
+
+    if (res.ok) {
+      const creado = res.data && res.data.data;
+      if (creado && creado.id != null) {
+        favoritos.set(clave, creado);
+        actualizarBotonFavorito(boton, item);
+      } else {
+        mostrarAviso('No se pudo confirmar el favorito.');
+      }
+    } else if (res.red) {
+      mostrarAviso('No se pudo conectar con el servidor. Inténtalo de nuevo.');
+    } else if (res.status === 422) {
+      const errors = (res.data && res.data.errors) || {};
+      const mensaje =
+        (errors.itemId && errors.itemId[0]) ||
+        (errors.favorite && errors.favorite[0]) ||
+        (res.data && res.data.message) ||
+        'No se pudo añadir el favorito.';
+      mostrarAviso(mensaje);
+    } else {
+      mostrarAviso((res.data && res.data.message) || 'No se pudo añadir el favorito.');
+    }
+  } finally {
+    boton.disabled = false;
+    // Si la sesión cambió, cerrarSesionLocal ya actualizó todos los corazones.
+    if (version === versionSesion) actualizarBotonFavorito(boton, item);
+  }
+}
+
+function crearTarjetaFavorito(item) {
+  const li = document.createElement('li');
+  li.className = 'emisora favorito-item';
+  li.dataset.url = item.streamUrl;
+
+  const boton = document.createElement('button');
+  boton.type = 'button';
+  boton.className = 'emisora-boton';
+  boton.setAttribute('aria-label', `Reproducir ${item.name}`);
+
+  if (!item.streamUrl) {
+    boton.disabled = true;
+    boton.title = 'Este favorito no tiene una URL de reproducción';
+  }
+
+  const emoji = item.type === 'tv' ? '📺' : '📻';
+  boton.appendChild(crearLogoEmisora(item.logo, 'emisora-logo', emoji));
+
+  const info = document.createElement('span');
+  info.className = 'favorito-info';
+
+  const nombre = document.createElement('span');
+  nombre.className = 'emisora-nombre';
+  nombre.textContent = item.name;
+  nombre.title = item.name;
+  info.appendChild(nombre);
+
+  const tipo = document.createElement('span');
+  tipo.className = 'favorito-tipo';
+  const etiquetaTipo = item.type === 'tv' ? 'TV' : 'Radio';
+  tipo.textContent = item.country ? `${etiquetaTipo} · ${item.country}` : etiquetaTipo;
+  info.appendChild(tipo);
+
+  boton.appendChild(info);
+
+  boton.addEventListener('click', () => {
+    if (!item.streamUrl) return;
+    if (item.type === 'tv') {
+      reproducirCanal(item.streamUrl, item.name);
+    } else {
+      reproducirEmisora(item.streamUrl, item.name, item.logo);
+    }
+  });
+
+  li.appendChild(boton);
+
+  const corazon = crearBotonFavorito(item);
+  if (corazon) li.appendChild(corazon);
+
+  return li;
+}
+
+function renderFavoritosPanel(estado = {}) {
+  const sidebar = document.getElementById('country-info');
+  const countryName = document.getElementById('country-name');
+  const codigo = document.getElementById('country-code');
+  if (!sidebar || !countryName || !codigo) return;
+
+  sidebar.classList.remove('hidden');
+  sidebar.querySelectorAll('.emisoras, .canales').forEach((lista) => lista.remove());
+  countryName.textContent = 'Mis favoritos';
+
+  if (estado.sinSesion) {
+    codigo.textContent = 'Inicia sesión para ver tus favoritos.';
+    codigo.style.color = '#aaa';
+    return;
+  }
+
+  if (estado.cargando) {
+    codigo.textContent = 'Cargando favoritos...';
+    codigo.style.color = '#ffd700';
+    return;
+  }
+
+  if (estado.error) {
+    codigo.textContent = 'No se pudieron cargar tus favoritos. Inténtalo de nuevo.';
+    codigo.style.color = '#ff9999';
+    return;
+  }
+
+  const fuente = Array.isArray(estado.lista) ? estado.lista : Array.from(favoritos.values());
+  const items = fuente.map(convertirFavoritoAItem).filter(Boolean);
+
+  if (!items.length) {
+    codigo.textContent = 'Todavía no tienes favoritos.';
+    codigo.style.color = '#aaa';
+    return;
+  }
+
+  codigo.textContent = `${items.length} favorito${items.length === 1 ? '' : 's'}`;
+  codigo.style.color = '#e0e0e0';
+
+  const lista = document.createElement('ul');
+  lista.className = 'emisoras favoritos';
+  items.forEach((item) => lista.appendChild(crearTarjetaFavorito(item)));
+  sidebar.appendChild(lista);
+}
+
+function mostrarFavoritos() {
+  marcarVistaFavoritos(true);
+
+  if (!usuarioActual) {
+    renderFavoritosPanel({ sinSesion: true });
+    abrirModalAuth('login');
+    return;
+  }
+
+  const cargados = Array.from(favoritos.values());
+  renderFavoritosPanel(cargados.length ? { lista: cargados } : { cargando: true });
+  cargarFavoritos({ renderPanel: true });
+}
+
+function setupCuentaYFavoritos() {
+  setupCuenta();
+  setupFavoritos();
+}
+
 // --- Eventos del toolbar ---
 
 function setupToolbar() {
-  const botones = document.querySelectorAll('.tab-btn');
+  // Solo las pestañas reales; la cuenta y "Mis favoritos" usan otras acciones.
+  const botones = document.querySelectorAll('.tab-btn[data-tab]');
   
   botones.forEach((btn) => {
     btn.addEventListener('click', () => {
@@ -1033,6 +2036,7 @@ function setupToolbar() {
       const tab = btn.dataset.tab;
       console.log('Modo cambiado a:', tab);
       modoActual = tab;
+      marcarVistaFavoritos(false);
       
       if (tab === 'tv') {
         // Detener lo que suene y cancelar la carga de radio en curso.
@@ -1116,6 +2120,7 @@ function calcularCentro(feature) {
 
 function handleCountryClick(feature) {
   selectedFeature = feature;
+  marcarVistaFavoritos(false);
   aplicarEstilos();
 
   // Vuelo suave de la cámara hacia el país seleccionado (~1 s).
@@ -1221,6 +2226,12 @@ async function init() {
   crearReproductor();
   crearReproductorTv();
   setupToolbar();
+  setupCuentaYFavoritos();
+
+  // La validación de sesión y la carga de favoritos no bloquean el globo.
+  inicializarSesion().catch((err) => {
+    console.error('Error comprobando la sesión:', err);
+  });
   
   // Verificar que la variable de entorno esté configurada
   if (!import.meta.env.VITE_API_URL) {

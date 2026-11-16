@@ -270,11 +270,24 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - ✅ Radio y TV mutuamente excluyentes; cambiar de pestaña detiene lo que esté sonando. El clic de país respeta la pestaña activa.
   - ✅ `npm run build` exitoso (1.01 s; hls.js separado en su propio chunk). Solo el aviso conocido de chunks >500 kB.
   - ⚠️ Sin verificar en navegador: reproducción real de streams HLS, ruta nativa en Safari/iOS, pantalla completa, aviso `secure`, CORS y contenido mixto HTTP/HTTPS.
+- **Frontend — cuentas y favoritos (2026-11-13)**:
+  - ✅ Botones "Mis favoritos" y "Entrar" en la barra. Con sesión, el botón muestra el nombre y un menú con "Salir"; sin sesión abre el modal.
+  - ✅ Modal de login/registro construido con `createElement`/`textContent`, con `role="dialog"`, `aria-modal="true"`, cierre con Escape, foco inicial y retorno al botón de origen, `autocomplete` correcto y contraseñas vaciadas tras cada intento.
+  - ✅ Errores 422 bajo cada campo; mensaje fijo para 429 ("Demasiados intentos, espera un minuto") y mensaje distinto para fallo de red. El botón de enviar se deshabilita mientras dura la petición.
+  - ✅ Token en `localStorage` (clave `explorador-planet:token`) dentro de `try/catch`; `GET /auth/me` al arrancar con 401 silencioso; 401 durante el uso cierra la sesión local y muestra "Tu sesión terminó, vuelve a entrar".
+  - ✅ `POST /auth/logout` y limpieza local en `finally`; las peticiones de favoritos en curso se invalidan con un contador de sesión y un `AbortController` para la lista.
+  - ✅ Corazones con `aria-label` y `aria-pressed` en tarjetas de radio y TV. Sin sesión abren el modal; con sesión usan `POST /favorites` o `DELETE /favorites/{id}`.
+  - ✅ El `country` sale del item (con respaldo en el país seleccionado) y se valida como 2 letras mayúsculas antes de enviarlo. Los errores `errors.itemId` y `errors.favorite` se muestran al usuario.
+  - ✅ Al marcar/quitar solo se actualiza el botón y el mapa en memoria (`type:itemId` -> favorito); no se re-renderiza la lista.
+  - ✅ Sección "Mis favoritos" en el panel con estados de cargando, vacío, error y lista; cada tarjeta reproduce con el reproductor de su tipo e incluye corazón para quitarla.
+  - ✅ `node --check front/main.js` correcto. `npm run build` exitoso (1.72 s; CSS 8.50 kB, JS 2.010,13 kB, hls.js en chunk aparte). Solo el aviso conocido de chunks >500 kB.
+  - ✅ Prueba de humo en navegador con API simulada: modal, 422, 429, fallo de red, login, carga de favoritos, alta/baja de corazón, lista de favoritos y logout.
+  - ⚠️ Sin verificar contra la API real: login/registro con MySQL, límites 429 reales, 401 reales, CORS y reproducción de streams guardados como favoritos.
 - **Entorno — Skills de OpenCode instaladas (2026-11-11)**: se instalaron de forma global (usuario, no por proyecto) las Skills `frontend-design` (oficial de Anthropic, `anthropics/skills`) y `frontend-design-systems` (`composio-community/opencode-skills`), mediante el CLI `skills` con `-g -a opencode`. Quedan en `~\.agents\skills\`, que OpenCode detecta automáticamente, así que estarán disponibles en cualquier proyecto. No se modificó ninguna configuración existente del repositorio. Relevantes para el trabajo pendiente del frontend (`front/`).
 
 ## En curso
 
-- **Frontend**: globo con aspecto de planeta, módulos Radio y TV conectados, con reproductores fijos separados
+- **Frontend**: globo con aspecto de planeta, módulos Radio y TV conectados, cuentas y favoritos integrados, con reproductores fijos separados
 - **Verificar en navegador**: texturas, atmósfera, hover, vuelo de cámara, damping y rotación deben verse en http://localhost:5173 al correr `npm run dev`
   - NOTA: `npm run build` confirma que los archivos son válidos, pero el aspecto y la fluidez requieren revisión visual
   - Para probar: correr `npm run dev` en `front/` y visitar http://localhost:5173
@@ -282,6 +295,8 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 ## Pendiente
 
 - **Probar clics en el globo, reproducción de audio/video y controles de ambos reproductores** en navegador real
+- **Probar cuentas y favoritos contra la API real**: login/registro, 422 por campo, 429, 401 de sesión caducada, límite de 200 y CORS
+- **Probar favoritos de radio y TV**: alta/baja del corazón, lista "Mis favoritos" y reproducción desde esa sección
 - **Probar canales HLS** en Chrome/Firefox (hls.js) y Safari/iOS (ruta nativa), incluida la pantalla completa
 - **Probar persistencia del volumen** entre recargas y el fallback 📻/📺 cuando un logo no carga
 - **Valorar el botón +18** en una etapa posterior (hoy no existe)
@@ -419,6 +434,12 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Frontend TV: `hls.js` es la única dependencia nueva y se carga con `import()` dinámico para no aumentar la carga inicial. Se prefiere hls.js cuando `Hls.isSupported()`; si no, se usa HLS nativo vía `canPlayType('application/vnd.apple.mpegurl')`.
 - Frontend: radio y TV son mutuamente excluyentes y comparten el volumen persistido en `explorador-planet:volumen`. El reproductor de TV ocupa el mismo hueco fijo abajo a la izquierda y pide pantalla completa sobre su contenedor para mantener los controles visibles.
 - No se añade botón +18 en esta etapa: el endpoint `/tv` ya excluye el contenido adulto.
+- Frontend: el token de Sanctum se guarda en `localStorage` con la clave `explorador-planet:token` dentro de `try/catch`; la sesión se valida con `GET /auth/me` y un 401 al arrancar se trata en silencio.
+- Frontend: los 401 posteriores al arranque cierran la sesión local y muestran el aviso "Tu sesión terminó, vuelve a entrar". `logout` limpia el estado local en `finally` aunque falle la petición.
+- Frontend: los favoritos se guardan en un `Map` con clave `type:itemId` y valor el favorito de la API (incluye su `id`). Marcar/quitar actualiza solo el corazón afectado; no se re-renderiza la lista.
+- Frontend: el `country` del favorito se toma del item y, si no es válido, del país seleccionado; antes de enviarlo se exige exactamente 2 letras mayúsculas.
+- Frontend: "Mis favoritos" es una acción del panel, no una tercera pestaña de módulo. Las tarjetas reproducen con el reproductor de radio o TV según su tipo, aunque la pestaña activa sea otra.
+- Frontend: el modal se construye con `createElement`, bloquea el globo con una capa fija, atrapa el foco mientras está abierto y lo devuelve al botón que lo abrió.
 
 ### Problemas abiertos
 
