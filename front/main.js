@@ -15,8 +15,8 @@ import {
   reproducirCanal,
 } from './src/reproductor-tv.js';
 import { cancelarCargaRadio, cargarRadio } from './src/radio.js';
+import { cancelarCargaTv, cargarTv } from './src/tv.js';
 import {
-  API_BASE,
   cargarVolumen,
   crearLogoEmisora,
 } from './src/utils.js';
@@ -33,9 +33,6 @@ const COLOR_PAIS_HOVER = 'rgba(255, 215, 0, 0.18)';
 const COLOR_PAIS_SELECCIONADO = 'rgba(255, 215, 0, 0.35)';
 
 let timerRotacion = null;
-
-// Carga de TV: controlador de la petición en curso.
-let controladorTv = null;
 
 // --- Sesión y favoritos ---
 // El token solo se guarda en localStorage (con try/catch) y se envía como Bearer.
@@ -176,63 +173,6 @@ function actualizarPanel(props, datosRadio = null) {
 
   // Asegurar que el panel sea visible
   sidebar.classList.remove('hidden');
-}
-
-// --- Pestaña TV ---
-
-/**
- * Carga los canales de TV de un país.
- * Usa su propio AbortController para descartar la petición anterior.
- * @param {string} iso2 - Código ISO-2 de 2 letras
- * @returns {Promise<Object>} estado de carga, canales normalizados y URL intentada
- */
-async function cargarTv(iso2) {
-  if (controladorTv) controladorTv.abort();
-  controladorTv = new AbortController();
-
-  const url = `${API_BASE}/countries/${iso2}/tv`;
-
-  try {
-    const res = await fetch(url, { signal: controladorTv.signal });
-
-    if (!res.ok) {
-      return { error: true, url };
-    }
-
-    const data = await res.json();
-
-    if (!data || !Array.isArray(data.data)) {
-      return { error: false, vacio: true, canales: [], url };
-    }
-
-    const canales = data.data
-      .filter((canal) => canal && canal.streamUrl)
-      .map((canal) => ({
-        // Se conserva el id y se toma el país del propio canal, con respaldo
-        // en el código del país seleccionado.
-        id: canal.id != null ? String(canal.id) : '',
-        country: normalizarCountry(canal.country, iso2),
-        nombre: canal.name || 'Sin nombre',
-        streamUrl: canal.streamUrl,
-        logo: canal.logo || '',
-        categoria: canal.category || '',
-        // La API envía booleano; solo un false explícito marca el enlace como inseguro.
-        secure: canal.secure !== false,
-      }));
-
-    return {
-      error: false,
-      vacio: canales.length === 0,
-      canales,
-      url,
-    };
-  } catch (e) {
-    if (e.name === 'AbortError') {
-      return { cancelled: true };
-    }
-    console.error('Error cargando TV:', e);
-    return { error: true, url };
-  }
 }
 
 // Pinta el panel en modo TV con los mismos estados que radio.
@@ -1249,7 +1189,7 @@ function setupToolbar() {
       } else if (tab === 'radio') {
         // Al volver a radio, cortar la TV y su carga pendiente.
         detenerTv();
-        if (controladorTv) controladorTv.abort();
+        cancelarCargaTv();
 
         // Si hay un país seleccionado, recargar radio de ese país
         if (leerEstado('selectedFeature')) {
