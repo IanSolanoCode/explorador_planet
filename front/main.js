@@ -1,6 +1,7 @@
 import Globe from 'globe.gl';
 
 import { leerEstado, escribirEstado, mapaFavoritos } from './src/estado.js';
+import { configurarManejador401, mostrarAviso, peticionApi } from './src/api.js';
 import {
   API_BASE,
   cargarVolumen,
@@ -41,7 +42,6 @@ let controladorFavoritos = null;
 let modalAuthEls = null;
 let modoAuth = 'login';
 let ultimoFocoModal = null;
-let avisoTimer = null;
 // Asocia cada corazón con su item para poder actualizarlo sin re-renderizar listas.
 const itemsBotonFavorito = new WeakMap();
 
@@ -1040,82 +1040,6 @@ function borrarToken() {
 
 function claveFavorito(tipo, itemId) {
   return `${tipo}:${itemId != null ? String(itemId) : ''}`;
-}
-
-/**
- * Petición central a la API.
- * - Añade el token solo cuando corresponde.
- * - Devuelve un resultado normalizado, también para fallos de red o abortos.
- * - Ante un 401 autenticado, cierra la sesión local y avisa (salvo que se pida
- *   manejar401: false, como en la validación silenciosa del arranque).
- */
-async function peticionApi(ruta, opciones = {}) {
-  const {
-    usarToken = true,
-    manejar401 = true,
-    headers: cabeceras = {},
-    ...opcionesFetch
-  } = opciones;
-
-  const headers = new Headers(cabeceras);
-  headers.set('Accept', 'application/json');
-  if (opcionesFetch.body && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  const tokenEnvio = usarToken ? leerEstado('token') : '';
-  if (tokenEnvio) headers.set('Authorization', `Bearer ${tokenEnvio}`);
-
-  let res;
-  try {
-    res = await fetch(`${API_BASE}${ruta}`, { ...opcionesFetch, headers });
-  } catch (e) {
-    if (e && e.name === 'AbortError') {
-      return { abortado: true, ok: false, status: 0, data: null };
-    }
-    return { red: true, ok: false, status: 0, data: null };
-  }
-
-  let data = null;
-  if (res.status !== 204) {
-    try {
-      const texto = await res.text();
-      if (texto) data = JSON.parse(texto);
-    } catch {
-      data = null;
-    }
-  }
-
-  // Solo se cierra la sesión si la petición usó el token que sigue vigente.
-  if (res.status === 401 && manejar401 && tokenEnvio && leerEstado('token') === tokenEnvio) {
-    cerrarSesionLocal({ aviso: 'Tu sesión terminó, vuelve a entrar.' });
-  }
-
-  return { ok: res.ok, status: res.status, data };
-}
-
-function mostrarAviso(texto) {
-  if (!texto) return;
-
-  let aviso = document.getElementById('aviso-global');
-  if (!aviso) {
-    aviso = document.createElement('div');
-    aviso.id = 'aviso-global';
-    aviso.className = 'aviso-global';
-    aviso.setAttribute('role', 'status');
-    aviso.setAttribute('aria-live', 'polite');
-    document.body.appendChild(aviso);
-  }
-
-  aviso.textContent = texto;
-  aviso.hidden = false;
-
-  if (avisoTimer) clearTimeout(avisoTimer);
-  avisoTimer = setTimeout(() => {
-    aviso.hidden = true;
-    aviso.textContent = '';
-    avisoTimer = null;
-  }, 5000);
 }
 
 function actualizarBotonCuenta() {
@@ -2142,6 +2066,8 @@ async function init() {
   // localStorage al importarse.
   escribirEstado('token', leerToken());
   escribirEstado('volumenRecordado', cargarVolumen());
+  // El 401 se maneja aquí, fuera de api.js, para no crear un ciclo con auth.
+  configurarManejador401(({ aviso }) => cerrarSesionLocal({ aviso }));
 
   await initGlobe();
   crearReproductor();
