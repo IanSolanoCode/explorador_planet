@@ -1,20 +1,24 @@
 import Globe from 'globe.gl';
 
-// Se usará cuando conectemos la pestaña Radio
-const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000/api';
-
-// Países sin código válido en ISO_A2 ni en WB_A2
-const ISO2_EXCEPTIONS = { Norway: 'NO' };
+import { leerEstado, escribirEstado, mapaFavoritos } from './src/estado.js';
+import {
+  API_BASE,
+  cargarVolumen,
+  crearLogoEmisora,
+  guardarVolumen,
+} from './src/utils.js';
+import {
+  getIso2,
+  getName,
+  normalizarCountry,
+  paisSeleccionadoIso2,
+} from './src/paises.js';
 
 // Colores de país casi transparentes para dejar ver la textura de la Tierra.
 const COLOR_PAIS_BASE = 'rgba(120, 170, 255, 0.10)';
 const COLOR_PAIS_HOVER = 'rgba(255, 215, 0, 0.18)';
 const COLOR_PAIS_SELECCIONADO = 'rgba(255, 215, 0, 0.35)';
 
-let globe = null;
-let selectedFeature = null;
-let hoveredFeature = null;
-let modoActual = 'radio'; // 'radio' o 'tv'
 let controladorAbort = null;
 let audioActual = null;
 let emisoraActual = null; // { nombre, url, logo } que suena ahora
@@ -33,14 +37,7 @@ let HlsClase = null; // módulo hls.js cargado bajo demanda
 // --- Sesión y favoritos ---
 // El token solo se guarda en localStorage (con try/catch) y se envía como Bearer.
 const TOKEN_CLAVE = 'explorador-planet:token';
-let token = leerToken();
-let usuarioActual = null;
-// Clave `${type}:${itemId}` -> favorito de la API (su valor incluye el id numérico).
-let favoritos = new Map();
-let versionSesion = 0; // invalida respuestas de favoritos de una sesión anterior
 let controladorFavoritos = null;
-let peticionFavoritosActual = 0;
-let vistaFavoritos = false;
 let modalAuthEls = null;
 let modoAuth = 'login';
 let ultimoFocoModal = null;
@@ -48,49 +45,18 @@ let avisoTimer = null;
 // Asocia cada corazón con su item para poder actualizarlo sin re-renderizar listas.
 const itemsBotonFavorito = new WeakMap();
 
-// Volumen recordado entre visitas: 0–1, con 0.7 por defecto.
-const VOLUMEN_CLAVE = 'explorador-planet:volumen';
-const VOLUMEN_POR_DEFECTO = 0.7;
-let volumenRecordado = cargarVolumen();
-
-// --- Lógica de códigos ISO-2 (sin campos _EH) ---
-
-function esCodigoValido(c) {
-  return typeof c === 'string' && c.length === 2 && c !== '-99';
-}
-
-function getIso2(props) {
-  if (esCodigoValido(props.ISO_A2)) return props.ISO_A2;
-  if (esCodigoValido(props.WB_A2)) return props.WB_A2;
-  return ISO2_EXCEPTIONS[props.ADMIN] || '';
-}
-
-function getName(props) {
-  return props.ADMIN || 'País desconocido';
-}
-
-// Normaliza un país a ISO-2 en mayúsculas. Si el item no trae un código
-// válido, usa el país seleccionado como respaldo y, si tampoco sirve, ''.
-function normalizarCountry(valor, respaldo = '') {
-  const propio = typeof valor === 'string' ? valor.trim().toUpperCase() : '';
-  if (/^[A-Z]{2}$/.test(propio)) return propio;
-
-  const alterno = typeof respaldo === 'string' ? respaldo.trim().toUpperCase() : '';
-  return /^[A-Z]{2}$/.test(alterno) ? alterno : '';
-}
-
 // --- Estilos del globe.gl ---
 
 function aplicarEstilos() {
-  globe
+  leerEstado('globe')
     .polygonCapColor((f) => {
-      if (f === selectedFeature) return COLOR_PAIS_SELECCIONADO;
-      if (f === hoveredFeature) return COLOR_PAIS_HOVER;
+      if (f === leerEstado('selectedFeature')) return COLOR_PAIS_SELECCIONADO;
+      if (f === leerEstado('hoveredFeature')) return COLOR_PAIS_HOVER;
       return COLOR_PAIS_BASE;
     })
     .polygonAltitude((f) => {
-      if (f === selectedFeature) return 0.03;
-      if (f === hoveredFeature) return 0.02;
+      if (f === leerEstado('selectedFeature')) return 0.03;
+      if (f === leerEstado('hoveredFeature')) return 0.02;
       return 0.005;
     });
 }
@@ -120,7 +86,7 @@ function actualizarPanel(props, datosRadio = null) {
   }
 
   // Gestionar sección "Reproduciendo"
-  if (modoActual === 'radio' && datosRadio) {
+  if (leerEstado('modoActual') === 'radio' && datosRadio) {
     if (datosRadio.loading) {
       codigo.textContent = 'Cargando...';
       codigo.style.color = '#ffd700';
@@ -198,7 +164,7 @@ function actualizarPanel(props, datosRadio = null) {
       sidebar.appendChild(lista);
       marcarEmisoraActiva();
     }
-  } else if (modoActual === 'radio' && !datosRadio) {
+  } else if (leerEstado('modoActual') === 'radio' && !datosRadio) {
     // No hay datos todavía o país sin código
     if (!iso2) {
       codigo.textContent = 'Este territorio no tiene código de país';
@@ -280,53 +246,6 @@ async function cargarRadio(iso2) {
 
 // --- Mini reproductor de radio fijo ---
 
-// Lee el volumen guardado validando que sea un número entre 0 y 1.
-function cargarVolumen() {
-  try {
-    const guardado = localStorage.getItem(VOLUMEN_CLAVE);
-    if (guardado === null || guardado.trim() === '') return VOLUMEN_POR_DEFECTO;
-    const valor = Number(guardado);
-    return Number.isFinite(valor) && valor >= 0 && valor <= 1
-      ? valor
-      : VOLUMEN_POR_DEFECTO;
-  } catch {
-    // localStorage puede fallar (modo privado o permisos): usar el valor por defecto.
-    return VOLUMEN_POR_DEFECTO;
-  }
-}
-
-function guardarVolumen(valor) {
-  try {
-    localStorage.setItem(VOLUMEN_CLAVE, String(valor));
-  } catch {
-    // Si no se puede persistir, el volumen sigue funcionando en esta sesión.
-  }
-}
-
-// Logo de emisora: <img loading="lazy"> solo para http(s); el resto es un emoji.
-// Si la imagen falla, se reemplaza por el emoji indicado (📻 radio, 📺 TV).
-function crearLogoEmisora(urlLogo, clase, emoji = '📻') {
-  if (typeof urlLogo === 'string' && /^https?:\/\//i.test(urlLogo)) {
-    const img = document.createElement('img');
-    img.className = clase;
-    img.loading = 'lazy';
-    img.alt = ''; // Decorativo: el nombre de la emisora ya está al lado.
-    img.addEventListener('error', () => {
-      const respaldo = document.createElement('span');
-      respaldo.className = clase;
-      respaldo.textContent = emoji;
-      img.replaceWith(respaldo);
-    });
-    // El src solo se asigna tras validar el esquema http(s).
-    img.src = urlLogo;
-    return img;
-  }
-  const respaldo = document.createElement('span');
-  respaldo.className = clase;
-  respaldo.textContent = emoji;
-  return respaldo;
-}
-
 // Construye una sola vez el reproductor fijo y guarda sus referencias.
 function crearReproductor() {
   if (reproductorEls) return;
@@ -373,12 +292,12 @@ function crearReproductor() {
   volumen.min = '0';
   volumen.max = '1';
   volumen.step = '0.01';
-  volumen.value = String(volumenRecordado);
+  volumen.value = String(leerEstado('volumenRecordado'));
   volumen.setAttribute('aria-label', 'Volumen');
   volumen.addEventListener('input', () => {
-    volumenRecordado = Number(volumen.value);
-    if (audioActual) audioActual.volume = volumenRecordado;
-    guardarVolumen(volumenRecordado);
+    escribirEstado('volumenRecordado', Number(volumen.value));
+    if (audioActual) audioActual.volume = leerEstado('volumenRecordado');
+    guardarVolumen(leerEstado('volumenRecordado'));
   });
 
   const btnDetener = document.createElement('button');
@@ -508,7 +427,7 @@ function reproducirEmisora(streamUrl, nombre, logo) {
 
   const audio = document.createElement('audio');
   audio.style.display = 'none';
-  audio.volume = volumenRecordado;
+  audio.volume = leerEstado('volumenRecordado');
   audio.muted = false;
 
   // Solo actualizar la UI si este audio sigue siendo el actual.
@@ -880,13 +799,13 @@ function crearReproductorTv() {
   volumen.min = '0';
   volumen.max = '1';
   volumen.step = '0.01';
-  volumen.value = String(volumenRecordado);
+  volumen.value = String(leerEstado('volumenRecordado'));
   volumen.setAttribute('aria-label', 'Volumen');
   volumen.addEventListener('input', () => {
-    volumenRecordado = Number(volumen.value);
-    if (videoActual) videoActual.volume = volumenRecordado;
-    if (audioActual) audioActual.volume = volumenRecordado;
-    guardarVolumen(volumenRecordado);
+    escribirEstado('volumenRecordado', Number(volumen.value));
+    if (videoActual) videoActual.volume = leerEstado('volumenRecordado');
+    if (audioActual) audioActual.volume = leerEstado('volumenRecordado');
+    guardarVolumen(leerEstado('volumenRecordado'));
   });
 
   const btnPantalla = document.createElement('button');
@@ -1013,7 +932,7 @@ async function reproducirCanal(streamUrl, nombre) {
   const video = document.createElement('video');
   video.className = 'tv-video';
   video.playsInline = true;
-  video.volume = volumenRecordado;
+  video.volume = leerEstado('volumenRecordado');
   video.muted = false;
   reproductorTvEls.pantalla.appendChild(video);
   videoActual = video;
@@ -1098,10 +1017,10 @@ function leerToken() {
 }
 
 function guardarToken(nuevoToken) {
-  token = typeof nuevoToken === 'string' ? nuevoToken : '';
+  escribirEstado('token', typeof nuevoToken === 'string' ? nuevoToken : '');
   try {
-    if (token) {
-      localStorage.setItem(TOKEN_CLAVE, token);
+    if (leerEstado('token')) {
+      localStorage.setItem(TOKEN_CLAVE, leerEstado('token'));
     } else {
       localStorage.removeItem(TOKEN_CLAVE);
     }
@@ -1111,7 +1030,7 @@ function guardarToken(nuevoToken) {
 }
 
 function borrarToken() {
-  token = '';
+  escribirEstado('token', '');
   try {
     localStorage.removeItem(TOKEN_CLAVE);
   } catch {
@@ -1121,11 +1040,6 @@ function borrarToken() {
 
 function claveFavorito(tipo, itemId) {
   return `${tipo}:${itemId != null ? String(itemId) : ''}`;
-}
-
-function paisSeleccionadoIso2() {
-  if (!selectedFeature || !selectedFeature.properties) return '';
-  return getIso2(selectedFeature.properties);
 }
 
 /**
@@ -1149,7 +1063,7 @@ async function peticionApi(ruta, opciones = {}) {
     headers.set('Content-Type', 'application/json');
   }
 
-  const tokenEnvio = usarToken ? token : '';
+  const tokenEnvio = usarToken ? leerEstado('token') : '';
   if (tokenEnvio) headers.set('Authorization', `Bearer ${tokenEnvio}`);
 
   let res;
@@ -1173,7 +1087,7 @@ async function peticionApi(ruta, opciones = {}) {
   }
 
   // Solo se cierra la sesión si la petición usó el token que sigue vigente.
-  if (res.status === 401 && manejar401 && tokenEnvio && token === tokenEnvio) {
+  if (res.status === 401 && manejar401 && tokenEnvio && leerEstado('token') === tokenEnvio) {
     cerrarSesionLocal({ aviso: 'Tu sesión terminó, vuelve a entrar.' });
   }
 
@@ -1209,8 +1123,8 @@ function actualizarBotonCuenta() {
   const menu = document.getElementById('menu-cuenta');
   if (!boton) return;
 
-  if (usuarioActual) {
-    const nombre = usuarioActual.name || 'Mi cuenta';
+  if (leerEstado('usuarioActual')) {
+    const nombre = leerEstado('usuarioActual').name || 'Mi cuenta';
     boton.textContent = nombre;
     boton.setAttribute('aria-label', `Cuenta de ${nombre}`);
   } else {
@@ -1233,7 +1147,7 @@ function setupCuenta() {
   if (boton) {
     boton.addEventListener('click', (evento) => {
       evento.stopPropagation();
-      if (!usuarioActual) {
+      if (!leerEstado('usuarioActual')) {
         abrirModalAuth('login');
         return;
       }
@@ -1264,11 +1178,11 @@ function setupCuenta() {
 }
 
 function marcarVistaFavoritos(activa) {
-  vistaFavoritos = !!activa;
+  escribirEstado('vistaFavoritos', !!activa);
   const boton = document.getElementById('btn-favoritos');
   if (!boton) return;
-  boton.classList.toggle('activo', vistaFavoritos);
-  boton.setAttribute('aria-pressed', vistaFavoritos ? 'true' : 'false');
+  boton.classList.toggle('activo', leerEstado('vistaFavoritos'));
+  boton.setAttribute('aria-pressed', leerEstado('vistaFavoritos') ? 'true' : 'false');
 }
 
 function setupFavoritos() {
@@ -1280,8 +1194,8 @@ function setupFavoritos() {
 // Invalida respuestas de favoritos en curso. Se usa al cerrar sesión para que
 // una petición lenta no vuelva a pintar corazones de una sesión ya cerrada.
 function invalidarPeticionesFavoritos() {
-  versionSesion += 1;
-  peticionFavoritosActual += 1;
+  escribirEstado('versionSesion', leerEstado('versionSesion') + 1);
+  escribirEstado('peticionFavoritosActual', leerEstado('peticionFavoritosActual') + 1);
   if (controladorFavoritos) {
     controladorFavoritos.abort();
     controladorFavoritos = null;
@@ -1296,7 +1210,7 @@ async function cerrarSesionRemota() {
   invalidarPeticionesFavoritos();
 
   try {
-    if (token) {
+    if (leerEstado('token')) {
       // Aunque falle la petición, la sesión local se cierra en el finally.
       await peticionApi('/auth/logout', { method: 'POST', manejar401: false });
     }
@@ -1310,23 +1224,23 @@ function cerrarSesionLocal({ aviso = '' } = {}) {
   invalidarPeticionesFavoritos();
 
   borrarToken();
-  usuarioActual = null;
-  favoritos.clear();
+  escribirEstado('usuarioActual', null);
+  mapaFavoritos().clear();
 
   actualizarBotonCuenta();
   actualizarCorazonesVisibles();
-  if (vistaFavoritos) renderFavoritosPanel({ sinSesion: true });
+  if (leerEstado('vistaFavoritos')) renderFavoritosPanel({ sinSesion: true });
   if (aviso) mostrarAviso(aviso);
 }
 
 async function inicializarSesion() {
   actualizarBotonCuenta();
-  if (!token) return;
+  if (!leerEstado('token')) return;
 
-  const version = versionSesion;
+  const version = leerEstado('versionSesion');
   // Silencioso a propósito: un token caducado al arrancar solo se descarta.
   const res = await peticionApi('/auth/me', { manejar401: false });
-  if (version !== versionSesion) return;
+  if (version !== leerEstado('versionSesion')) return;
 
   if (res.status === 401) {
     cerrarSesionLocal();
@@ -1334,10 +1248,10 @@ async function inicializarSesion() {
   }
 
   if (res.ok && res.data && res.data.data) {
-    usuarioActual = res.data.data;
+    escribirEstado('usuarioActual', res.data.data);
     actualizarBotonCuenta();
     actualizarCorazonesVisibles();
-    await cargarFavoritos({ renderPanel: vistaFavoritos });
+    await cargarFavoritos({ renderPanel: leerEstado('vistaFavoritos') });
   }
 }
 
@@ -1691,21 +1605,21 @@ async function enviarFormularioAuth(evento) {
     }
 
     const auth = res.data && res.data.data;
-    if (!auth || !auth.token || !auth.user) {
+    if (!auth || !auth.leerEstado('token') || !auth.user) {
       mostrarMensajeAuth('La respuesta del servidor no es válida. Inténtalo de nuevo.');
       return;
     }
 
-    guardarToken(auth.token);
-    usuarioActual = auth.user;
-    versionSesion += 1;
-    peticionFavoritosActual += 1;
+    guardarToken(auth.leerEstado('token'));
+    escribirEstado('usuarioActual', auth.user);
+    escribirEstado('versionSesion', leerEstado('versionSesion') + 1);
+    escribirEstado('peticionFavoritosActual', leerEstado('peticionFavoritosActual') + 1);
     actualizarBotonCuenta();
     actualizarCorazonesVisibles();
     cerrarModalAuth();
 
     // La carga de favoritos no bloquea el cierre del modal.
-    cargarFavoritos({ renderPanel: vistaFavoritos });
+    cargarFavoritos({ renderPanel: leerEstado('vistaFavoritos') });
   } finally {
     // Nunca conservar contraseñas en el DOM tras un intento.
     campos.password.input.value = '';
@@ -1734,16 +1648,17 @@ function convertirFavoritoAItem(favorito) {
 }
 
 async function cargarFavoritos({ renderPanel = false } = {}) {
-  if (!usuarioActual || !token) {
-    if (renderPanel || vistaFavoritos) renderFavoritosPanel({ sinSesion: true });
+  if (!leerEstado('usuarioActual') || !leerEstado('token')) {
+    if (renderPanel || leerEstado('vistaFavoritos')) renderFavoritosPanel({ sinSesion: true });
     return;
   }
 
   if (controladorFavoritos) controladorFavoritos.abort();
   controladorFavoritos = new AbortController();
   const controlador = controladorFavoritos;
-  const version = versionSesion;
-  const peticion = ++peticionFavoritosActual;
+  const version = leerEstado('versionSesion');
+  const peticion = leerEstado('peticionFavoritosActual') + 1;
+  escribirEstado('peticionFavoritosActual', peticion);
 
   let res;
   try {
@@ -1753,26 +1668,26 @@ async function cargarFavoritos({ renderPanel = false } = {}) {
   }
 
   // Una respuesta vieja o de otra sesión no debe tocar el estado actual.
-  if (res.abortado || peticion !== peticionFavoritosActual || version !== versionSesion || !usuarioActual) {
+  if (res.abortado || peticion !== leerEstado('peticionFavoritosActual') || version !== leerEstado('versionSesion') || !leerEstado('usuarioActual')) {
     return;
   }
 
   if (!res.ok) {
-    if (renderPanel || vistaFavoritos) renderFavoritosPanel({ error: true });
+    if (renderPanel || leerEstado('vistaFavoritos')) renderFavoritosPanel({ error: true });
     return;
   }
 
   const lista = res.data && Array.isArray(res.data.data) ? res.data.data : [];
-  favoritos.clear();
+  mapaFavoritos().clear();
   lista.forEach((favorito) => {
     if (!favorito || (favorito.type !== 'tv' && favorito.type !== 'radio')) return;
     if (favorito.id == null || favorito.itemId == null) return;
-    favoritos.set(claveFavorito(favorito.type, String(favorito.itemId)), favorito);
+    mapaFavoritos().set(claveFavorito(favorito.type, String(favorito.itemId)), favorito);
   });
 
   actualizarCorazonesVisibles();
-  if (renderPanel || vistaFavoritos) {
-    renderFavoritosPanel({ lista: Array.from(favoritos.values()) });
+  if (renderPanel || leerEstado('vistaFavoritos')) {
+    renderFavoritosPanel({ lista: Array.from(mapaFavoritos().values()) });
   }
 }
 
@@ -1780,7 +1695,7 @@ function actualizarBotonFavorito(boton, item) {
   if (!boton || !item || item.itemId == null) return;
 
   const activo = Boolean(
-    usuarioActual && favoritos.has(claveFavorito(item.type, String(item.itemId)))
+    leerEstado('usuarioActual') && mapaFavoritos().has(claveFavorito(item.type, String(item.itemId)))
   );
   const nombre = item.name || 'este contenido';
   boton.textContent = activo ? '♥' : '♡';
@@ -1816,7 +1731,7 @@ function actualizarCorazonesVisibles() {
 }
 
 async function alternarFavorito(item, boton) {
-  if (!usuarioActual) {
+  if (!leerEstado('usuarioActual')) {
     abrirModalAuth('login');
     return;
   }
@@ -1835,8 +1750,8 @@ async function alternarFavorito(item, boton) {
   }
 
   const clave = claveFavorito(tipo, itemId);
-  const favorito = favoritos.get(clave);
-  const version = versionSesion;
+  const favorito = mapaFavoritos().get(clave);
+  const version = leerEstado('versionSesion');
 
   boton.disabled = true;
   try {
@@ -1845,10 +1760,10 @@ async function alternarFavorito(item, boton) {
         method: 'DELETE',
       });
 
-      if (version !== versionSesion || !usuarioActual) return;
+      if (version !== leerEstado('versionSesion') || !leerEstado('usuarioActual')) return;
 
       if (res.ok || res.status === 404) {
-        favoritos.delete(clave);
+        mapaFavoritos().delete(clave);
         actualizarBotonFavorito(boton, item);
         if (res.status === 404) mostrarAviso('El favorito ya no existía.');
       } else if (res.red) {
@@ -1873,12 +1788,12 @@ async function alternarFavorito(item, boton) {
       body: JSON.stringify(body),
     });
 
-    if (version !== versionSesion || !usuarioActual) return;
+    if (version !== leerEstado('versionSesion') || !leerEstado('usuarioActual')) return;
 
     if (res.ok) {
       const creado = res.data && res.data.data;
       if (creado && creado.id != null) {
-        favoritos.set(clave, creado);
+        mapaFavoritos().set(clave, creado);
         actualizarBotonFavorito(boton, item);
       } else {
         mostrarAviso('No se pudo confirmar el favorito.');
@@ -1899,7 +1814,7 @@ async function alternarFavorito(item, boton) {
   } finally {
     boton.disabled = false;
     // Si la sesión cambió, cerrarSesionLocal ya actualizó todos los corazones.
-    if (version === versionSesion) actualizarBotonFavorito(boton, item);
+    if (version === leerEstado('versionSesion')) actualizarBotonFavorito(boton, item);
   }
 }
 
@@ -1983,7 +1898,7 @@ function renderFavoritosPanel(estado = {}) {
     return;
   }
 
-  const fuente = Array.isArray(estado.lista) ? estado.lista : Array.from(favoritos.values());
+  const fuente = Array.isArray(estado.lista) ? estado.lista : Array.from(mapaFavoritos().values());
   const items = fuente.map(convertirFavoritoAItem).filter(Boolean);
 
   if (!items.length) {
@@ -2004,13 +1919,13 @@ function renderFavoritosPanel(estado = {}) {
 function mostrarFavoritos() {
   marcarVistaFavoritos(true);
 
-  if (!usuarioActual) {
+  if (!leerEstado('usuarioActual')) {
     renderFavoritosPanel({ sinSesion: true });
     abrirModalAuth('login');
     return;
   }
 
-  const cargados = Array.from(favoritos.values());
+  const cargados = Array.from(mapaFavoritos().values());
   renderFavoritosPanel(cargados.length ? { lista: cargados } : { cargando: true });
   cargarFavoritos({ renderPanel: true });
 }
@@ -2035,7 +1950,7 @@ function setupToolbar() {
       
       const tab = btn.dataset.tab;
       console.log('Modo cambiado a:', tab);
-      modoActual = tab;
+      escribirEstado('modoActual', tab);
       marcarVistaFavoritos(false);
       
       if (tab === 'tv') {
@@ -2044,7 +1959,7 @@ function setupToolbar() {
         detenerTv();
         if (controladorAbort) controladorAbort.abort();
 
-        const feature = selectedFeature;
+        const feature = leerEstado('selectedFeature');
         if (!feature) {
           const codigo = document.getElementById('country-code');
           codigo.textContent = 'Selecciona un país para ver canales de TV';
@@ -2055,7 +1970,7 @@ function setupToolbar() {
             actualizarPanelTv(feature.properties, { loading: true });
             cargarTv(iso2).then((datos) => {
               // Descartar respuestas si el usuario cambió de pestaña o de país.
-              if (modoActual !== 'tv' || selectedFeature !== feature) return;
+              if (leerEstado('modoActual') !== 'tv' || leerEstado('selectedFeature') !== feature) return;
               actualizarPanelTv(feature.properties, datos);
             });
           } else {
@@ -2068,12 +1983,12 @@ function setupToolbar() {
         if (controladorTv) controladorTv.abort();
 
         // Si hay un país seleccionado, recargar radio de ese país
-        if (selectedFeature) {
-          const feature = selectedFeature;
+        if (leerEstado('selectedFeature')) {
+          const feature = leerEstado('selectedFeature');
           const iso2 = getIso2(feature.properties);
           if (iso2) {
             cargarRadio(iso2).then(datos => {
-              if (modoActual !== 'radio' || selectedFeature !== feature) return;
+              if (leerEstado('modoActual') !== 'radio' || leerEstado('selectedFeature') !== feature) return;
               actualizarPanel(feature.properties, datos);
             });
           } else {
@@ -2119,23 +2034,23 @@ function calcularCentro(feature) {
 }
 
 function handleCountryClick(feature) {
-  selectedFeature = feature;
+  escribirEstado('selectedFeature', feature);
   marcarVistaFavoritos(false);
   aplicarEstilos();
 
   // Vuelo suave de la cámara hacia el país seleccionado (~1 s).
   const centro = calcularCentro(feature);
-  globe.pointOfView({ lat: centro.lat, lng: centro.lng, altitude: 1.6 }, 1000);
+  leerEstado('globe').pointOfView({ lat: centro.lat, lng: centro.lng, altitude: 1.6 }, 1000);
 
   const iso2 = getIso2(feature.properties);
 
   // La pestaña activa decide qué módulo cargar; ya no se fuerza radio.
-  if (modoActual === 'tv') {
+  if (leerEstado('modoActual') === 'tv') {
     if (iso2) {
       actualizarPanelTv(feature.properties, { loading: true });
       cargarTv(iso2).then((datos) => {
         // Descartar respuestas si cambió la pestaña o el país seleccionado.
-        if (modoActual !== 'tv' || selectedFeature !== feature) return;
+        if (leerEstado('modoActual') !== 'tv' || leerEstado('selectedFeature') !== feature) return;
         actualizarPanelTv(feature.properties, datos);
       });
     } else {
@@ -2148,7 +2063,7 @@ function handleCountryClick(feature) {
   if (iso2) {
     // Cargar radio para este país
     cargarRadio(iso2).then(datos => {
-      if (modoActual !== 'radio' || selectedFeature !== feature) return;
+      if (leerEstado('modoActual') !== 'radio' || leerEstado('selectedFeature') !== feature) return;
       actualizarPanel(feature.properties, datos);
     });
   } else {
@@ -2164,7 +2079,7 @@ async function initGlobe() {
   if (!res.ok) throw new Error(`No se pudo cargar el mapa (HTTP ${res.status})`);
   const { features } = await res.json();
 
-  globe = Globe()(document.getElementById('globe'))
+  const globe = Globe()(document.getElementById('globe'))
     .backgroundColor('#0a0a0f')
     .globeImageUrl('/textures/earth-blue-marble.jpg')
     .bumpImageUrl('/textures/earth-topology.png')
@@ -2183,18 +2098,19 @@ async function initGlobe() {
     })
     .onPolygonClick((f) => handleCountryClick(f))
     .onPolygonHover((f) => {
-      hoveredFeature = f;
+      escribirEstado('hoveredFeature', f);
       aplicarEstilos();
     });
 
+  escribirEstado('globe', globe);
   aplicarEstilos();
   configurarControles();
-  globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  leerEstado('globe').renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2));
 }
 
 // Controles de cámara: inercia, zoom limitado y rotación que se pausa al interactuar
 function configurarControles() {
-  const c = globe.controls();
+  const c = leerEstado('globe').controls();
   c.enableDamping = true;
   c.dampingFactor = 0.08;
   c.minDistance = 150;
@@ -2222,6 +2138,11 @@ function configurarControles() {
 // --- Inicialización de la aplicación ---
 
 async function init() {
+  // El token y el volumen se leen al arrancar; los módulos no tocan
+  // localStorage al importarse.
+  escribirEstado('token', leerToken());
+  escribirEstado('volumenRecordado', cargarVolumen());
+
   await initGlobe();
   crearReproductor();
   crearReproductorTv();
