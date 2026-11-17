@@ -5,8 +5,9 @@
 - Vite 5 + JavaScript vanilla (sin framework)
 - globe.gl para el globo 3D
 - datasets/geo-countries para los datos GeoJSON de países
-- hls.js se añadirá después para soportar transmisiones TV en vivo
+- hls.js (carga dinámica) para las transmisiones TV en vivo
 - CSS simple (arquitectura BEM no aplicable, estilos en un solo archivo)
+- eslint como devDependency, solo para `no-undef` y `no-unused-vars`
 
 ## Puesta en marcha
 
@@ -26,19 +27,52 @@
 5. Asegurarse de que la API esté corriendo en http://127.0.0.1:8000
    - Desde api/: `php artisan serve`
    - La variable VITE_API_URL en front/.env apunta a http://127.0.0.1:8000/api por defecto
+6. Comprobar el código antes de commitear:
+   ```bash
+   node --check main.js
+   npx eslint main.js src
+   npm run build
+   ```
 
 ## Estructura de archivos
 
 ```
 front/
 ├── index.html          # Página principal con canvas del globo
-├── main.js             # Lógica principal: globe.gl, GeoJSON, clicks, toolbar
+├── main.js             # Punto de entrada: imports e init()
 ├── main.css            # Estilos del globo, panel lateral y barra de pestañas
+├── eslint.config.js    # Config mínima del refactor (no-undef y no-unused-vars)
+├── src/
+│   ├── estado.js       # Estado compartido mediante leerEstado/escribirEstado
+│   ├── registro.js     # Registro de detenedores y oyentes de sesión
+│   ├── utils.js        # API_BASE, volumen y logos
+│   ├── paises.js       # Códigos ISO-2 y nombres de países
+│   ├── api.js          # peticionApi, mostrarAviso y hook del 401
+│   ├── radio.js        # Carga de emisoras con AbortController
+│   ├── tv.js           # Carga de canales con AbortController
+│   ├── panel.js        # Panel lateral de radio y TV
+│   ├── favoritos.js    # Corazones, lista y peticiones de favoritos
+│   ├── auth.js         # Token, cierre de sesión y /auth/me
+│   ├── modal-auth.js   # Modal de login y registro
+│   ├── cuenta.js       # Botón y menú de cuenta
+│   ├── globo.js        # Globo, clic de país, cámara y controles
+│   ├── toolbar.js      # Pestañas Radio/TV
+│   ├── reproductor-radio.js
+│   └── reproductor-tv.js
 ├── .env                # Variables de entorno (VITE_API_URL) - NUNCA versionar
 ├── .env.example        # Ejemplo de variables de entorno - SÍ versionar
 ├── .gitignore          # Ignora .env y node_modules front
 └── node_modules/       # Dependencias (ignorado por git)
 ```
+
+Los módulos de `src/` no tienen efectos secundarios al importarse: no crean
+DOM, no registran eventos ni leen `localStorage`. Todo eso ocurre en funciones
+que llama `init()`, en el mismo orden que el `main.js` original.
+
+Para romper ciclos se usa `src/registro.js`: radio y TV se detienen entre sí con
+`registrarDetenedor`/`detenerRegistrado`, y auth avisa de los cambios de sesión
+con `alCambiarSesion`/`notificarCambioSesion`. El modal se inyecta en favoritos
+con `configurarAperturaAuth`.
 
 ## Funcionalidades
 
@@ -54,7 +88,7 @@ El dataset `ne_110m_admin_0_countries.geojson` (Natural Earth 110m) usa los camp
 - `ISO_A2`: código ISO-2 de 2 letras (o "-99" si no disponible)
 - `WB_A2`: código World Bank de 2 letras (alternativa cuando ISO_A2 es "-99")
 
-**Lógica en main.js** (función `getIso2FromFeature`):
+**Lógica en `src/paises.js`** (función `getIso2`):
 1. Si `ISO_A2` tiene 2 letras y no es "-99", úsalo
 2. Si no, si `WB_A2` tiene 2 letras y no es "-99", úsalo
 3. Si no, busca en excepciones manuales: `{ "Norway": "NO" }`

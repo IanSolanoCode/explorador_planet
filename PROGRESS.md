@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-11-11
+Última actualización: 2026-11-16
 
 ## Hecho
 
@@ -283,6 +283,16 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - ✅ `node --check front/main.js` correcto. `npm run build` exitoso (1.72 s; CSS 8.50 kB, JS 2.010,13 kB, hls.js en chunk aparte). Solo el aviso conocido de chunks >500 kB.
   - ✅ Prueba de humo en navegador con API simulada: modal, 422, 429, fallo de red, login, carga de favoritos, alta/baja de corazón, lista de favoritos y logout.
   - ⚠️ Sin verificar contra la API real: login/registro con MySQL, límites 429 reales, 401 reales, CORS y reproducción de streams guardados como favoritos.
+- **Frontend — refactor modular (2026-11-16)**:
+  - ✅ `front/main.js` dividido en módulos ES dentro de `front/src/` sin cambiar el comportamiento visible. `main.js` queda como punto de entrada con imports e `init()`.
+  - ✅ Módulos: `estado`, `registro`, `utils`, `paises`, `api`, `radio`, `tv`, `panel`, `favoritos`, `auth`, `modal-auth`, `cuenta`, `globo`, `toolbar`, `reproductor-radio` y `reproductor-tv`.
+  - ✅ El estado compartido se lee y escribe con `leerEstado`/`escribirEstado`; el Map de favoritos se expone con `mapaFavoritos()` y solo se muta, nunca se reasigna.
+  - ✅ Sin efectos secundarios al importar: los módulos no crean DOM, no registran eventos y no leen `localStorage`; todo ocurre en funciones que llama `init()` en el orden original.
+  - ✅ Ciclos rotos con `src/registro.js`: radio y TV se detienen mutuamente sin importarse, y auth notifica los cambios de sesión a cuenta. El 401 de `api.js` se inyecta con `configurarManejador401` y el modal de favoritos con `configurarAperturaAuth`.
+  - ✅ Se eliminó el único `console.log('Modo cambiado a:', tab)`; no se cambió ningún id de `index.html` ni clase de `main.css`.
+  - ✅ Se añadió `eslint@10.14.0` (versión publicada el 2026-10-30, más de 14 días antes) como devDependency fijada, con `front/eslint.config.js` limitado a `no-undef` y `no-unused-vars` para navegador y módulos ES. Un build exitoso no detecta variables sin definir; eslint sí.
+  - ✅ Tras cada paso: `node --check`, `npx eslint main.js src` y `npm run build` correctos, con solo el aviso conocido de chunks >500 kB. Commits locales por paso, sin push.
+  - ⚠️ Sin verificar en navegador ni contra la API real después del refactor: clics, reproducción, cuentas, favoritos y modal.
 - **Entorno — Skills de OpenCode instaladas (2026-11-11)**: se instalaron de forma global (usuario, no por proyecto) las Skills `frontend-design` (oficial de Anthropic, `anthropics/skills`) y `frontend-design-systems` (`composio-community/opencode-skills`), mediante el CLI `skills` con `-g -a opencode`. Quedan en `~\.agents\skills\`, que OpenCode detecta automáticamente, así que estarán disponibles en cualquier proyecto. No se modificó ninguna configuración existente del repositorio. Relevantes para el trabajo pendiente del frontend (`front/`).
 
 ## En curso
@@ -448,3 +458,10 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - iptv-org no expone `isOfficial`; no se puede filtrar por origen autorizado sin una lista blanca propia.
 - El endpoint `/tv/adult` está implementado, pero su utilidad práctica es casi nula con los datos actuales (2 canales NSFW con stream en todo el mundo).
 - No hay reintentos ante fallos de Radio Browser; la caché de 6 h y la rotación de servidores son la única mitigación.
+
+### Refactor del front (2026-11-16)
+
+- El front se organiza en módulos ES bajo `front/src/`; `front/main.js` solo importa y llama a `init()`. El estado compartido vive en `src/estado.js` y los ciclos se rompen con callbacks en `src/registro.js` o con funciones inyectadas (`configurarManejador401`, `configurarAperturaAuth`).
+- Se añadió eslint solo como herramienta de desarrollo, fijado en `10.14.0` y con dos reglas (`no-undef`, `no-unused-vars`). No se añadieron reglas de estilo ni se usó para reformatear el código. Motivo: un build exitoso no detecta variables sin definir; eslint sí.
+- Sin efectos secundarios al importar: ningún módulo crea DOM, registra eventos ni toca `localStorage` al cargarse. Todo ocurre en funciones que llama `init()`, en el mismo orden que el `main.js` original.
+- El Map de favoritos solo se muta (`mapaFavoritos()`), nunca se reasigna con `escribirEstado`, porque las peticiones en curso dependen de esa instancia.

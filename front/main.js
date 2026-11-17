@@ -10,12 +10,6 @@ import { setupCuenta } from './src/cuenta.js';
 import { abrirModalAuth } from './src/modal-auth.js';
 import { cargarVolumen } from './src/utils.js';
 
-
-function setupCuentaYFavoritos() {
-  setupCuenta();
-  setupFavoritos();
-}
-
 // --- Inicialización de la aplicación ---
 
 async function init() {
@@ -32,7 +26,8 @@ async function init() {
   setupToolbar();
   // Favoritos no importa el modal: recibe la función que lo abre.
   configurarAperturaAuth(abrirModalAuth);
-  setupCuentaYFavoritos();
+  setupCuenta();
+  setupFavoritos();
 
   // La validación de sesión y la carga de favoritos no bloquean el globo.
   inicializarSesion().catch((err) => {
