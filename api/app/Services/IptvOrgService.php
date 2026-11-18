@@ -38,9 +38,73 @@ class IptvOrgService
         return $adult ? $adultChannels : $regular;
     }
 
+    /**
+     * Devuelve los pares (canal, URL) de todos los países con una sola
+     * descarga de los archivos y caché propia de 6 h.
+     *
+     * Es aditivo: no altera `channelsByCountry` ni sus claves de caché. Lo usa
+     * el comando de comprobación, que necesita el conjunto completo de streams
+     * servidos para recorrerlos por antigüedad. Se omite logos.json porque no
+     * interviene en el filtrado ni en la elección del stream.
+     *
+     * @return array<int, array{item_id: string, streamUrl: string, country: string}>
+     */
+    public function allStreamPairs(): array
+    {
+        $cache = Cache::store('file');
+        $key = 'iptv:tv:pairs';
+
+        if ($cache->has($key)) {
+            return $cache->get($key);
+        }
+
+        $pairs = $this->buildPairs();
+
+        $cache->put($key, $pairs, now()->addHours(self::CACHE_HOURS));
+
+        return $pairs;
+    }
+
     private function cacheKey(string $code, bool $adult): string
     {
         return 'iptv:tv:'.($adult ? 'adult:' : '').$code;
+    }
+
+    /**
+     * Construye los pares de todos los países reutilizando los mismos filtros
+     * que `build()`: canales cerrados, blocklist, referrer/user_agent y el
+     * mejor stream por canal.
+     *
+     * @return array<int, array{item_id: string, streamUrl: string, country: string}>
+     */
+    private function buildPairs(): array
+    {
+        $channels = $this->allChannels();
+        $streams = $this->streamsFor($channels);
+        $channels = $this->excludeBlocked($channels);
+
+        $pairs = [];
+
+        foreach ($channels as $id => $channel) {
+            if (! isset($streams[$id])) {
+                continue;
+            }
+
+            $pairs[] = [
+                'item_id' => $channel['id'],
+                'streamUrl' => $streams[$id]['url'],
+                'country' => $channel['country'],
+            ];
+        }
+
+        Log::info('IPTV pares construidos.', [
+            'pairs' => count($pairs),
+            'peak_memory_bytes' => memory_get_peak_usage(true),
+        ]);
+
+        unset($channels, $streams);
+
+        return $pairs;
     }
 
     /**
@@ -100,11 +164,37 @@ class IptvOrgService
      */
     private function channelsFor(string $code): array
     {
-        $payload = $this->fetchJson('channels.json');
+        // Se filtra por país sin retener los canales del resto del mundo.
+        return $this->collectChannels($this->fetchJson('channels.json'), $code);
+    }
+
+    /**
+     * Todos los canales abiertos del dataset, sin filtrar por país.
+     *
+     * @return array<string, array<string, mixed>>
+     */
+    private function allChannels(): array
+    {
+        return $this->collectChannels($this->fetchJson('channels.json'), null);
+    }
+
+    /**
+     * Normaliza el payload de channels.json. Con `$code` null conserva todos
+     * los países; en ambos casos descarta canales cerrados y sin id.
+     *
+     * @param  array<int, mixed>  $payload
+     * @return array<string, array<string, mixed>>
+     */
+    private function collectChannels(array $payload, ?string $code): array
+    {
         $channels = [];
 
         foreach ($payload as $channel) {
-            if (($channel['country'] ?? null) !== $code || ! empty($channel['closed'])) {
+            if ($code !== null && ($channel['country'] ?? null) !== $code) {
+                continue;
+            }
+
+            if (! empty($channel['closed'])) {
                 continue;
             }
 
@@ -117,7 +207,7 @@ class IptvOrgService
             $channels[$id] = [
                 'id' => $id,
                 'name' => trim((string) ($channel['name'] ?? '')),
-                'country' => $code,
+                'country' => (string) ($channel['country'] ?? ''),
                 'categories' => is_array($channel['categories'] ?? null) ? $channel['categories'] : [],
                 'is_nsfw' => (bool) ($channel['is_nsfw'] ?? false),
             ];
