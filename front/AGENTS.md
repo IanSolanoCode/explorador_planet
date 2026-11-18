@@ -55,6 +55,8 @@ front/
 │   ├── auth.js         # Token, cierre de sesión y /auth/me
 │   ├── modal-auth.js   # Modal de login y registro
 │   ├── cuenta.js       # Botón y menú de cuenta
+│   ├── admin.js        # Botón Admin, botón Bloquear y formulario de bloqueo
+│   ├── admin-bloqueos.js # Panel "Bloqueos" y desbloqueo
 │   ├── globo.js        # Globo, clic de país, cámara y controles
 │   ├── toolbar.js      # Pestañas Radio/TV
 │   ├── reproductor-radio.js
@@ -73,6 +75,14 @@ Para romper ciclos se usa `src/registro.js`: radio y TV se detienen entre sí co
 `registrarDetenedor`/`detenerRegistrado`, y auth avisa de los cambios de sesión
 con `alCambiarSesion`/`notificarCambioSesion`. El modal se inyecta en favoritos
 con `configurarAperturaAuth`.
+
+La administración se divide en `admin.js` (botón "Admin", botón "Bloquear" por
+tarjeta y formulario de bloqueo) y `admin-bloqueos.js` (panel "Bloqueos" y
+desbloqueo) para no superar ~500 líneas por archivo. El sentido de dependencia
+es `admin.js` → `admin-bloqueos.js`; el segundo no importa al primero. La
+visibilidad de la administración se controla con la clase `es-admin` en
+`<body>`: los botones "Bloquear" se crean siempre y el CSS los muestra u oculta,
+así las listas ya pintadas se actualizan al cambiar de sesión sin re-renderizar.
 
 ## Funcionalidades
 

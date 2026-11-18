@@ -2,7 +2,7 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-11-16
+Última actualización: 2026-11-17
 
 ## Hecho
 
@@ -293,6 +293,19 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
   - ✅ Se añadió `eslint@10.14.0` (versión publicada el 2026-10-30, más de 14 días antes) como devDependency fijada, con `front/eslint.config.js` limitado a `no-undef` y `no-unused-vars` para navegador y módulos ES. Un build exitoso no detecta variables sin definir; eslint sí.
   - ✅ Tras cada paso: `node --check`, `npx eslint main.js src` y `npm run build` correctos, con solo el aviso conocido de chunks >500 kB. Commits locales por paso, sin push.
   - ⚠️ Sin verificar en navegador ni contra la API real después del refactor: clics, reproducción, cuentas, favoritos y modal.
+- **Frontend — panel de administrador (2026-11-17)**:
+  - ✅ Nuevo módulo `front/src/admin.js` (botón "Admin", botón "Bloquear" por tarjeta y formulario de bloqueo) y `front/src/admin-bloqueos.js` (panel "Bloqueos"), separados para no superar ~500 líneas por archivo y sin dependencias circulares (`admin.js` → `admin-bloqueos.js`; ninguno importa `admin.js`).
+  - ✅ El botón "Admin" se crea desde JS en la barra (antes del menú de cuenta) solo si `usuarioActual.role === "admin"` (rol de `/auth/me` o del login, nunca de localStorage) y se retira al cerrar sesión o cambiar de usuario.
+  - ✅ Visibilidad de los botones "Bloquear": la clase `es-admin` en `<body>` se activa/desactiva en cada cambio de sesión (`alCambiarSesion`), así las tarjetas ya dibujadas muestran u ocultan su botón sin reconstruirse.
+  - ✅ Botón "Bloquear" en cada tarjeta de radio y TV (texto literal, `aria-label="Bloquear {nombre}"`), mismo patrón que el corazón y con `preventDefault`/`stopPropagation` para no reproducir.
+  - ✅ Formulario en modal (`role="dialog"`, `aria-modal`, foco inicial, Escape, trampa de foco) con motivo obligatorio y `maxlength=255`. Un solo modal: no se abre si el de auth está visible. Al cerrar, el foco vuelve al botón que lo abrió.
+  - ✅ `POST /admin/blocked` con `type` e `itemId` de la tarjeta. 422 bajo el campo (`errors.reason` o `errors.itemId`, incluido el duplicado "Este contenido ya está bloqueado."), 403 como "No tienes permisos de administrador" sin cerrar sesión, 401 lo maneja `api.js` como el resto.
+  - ✅ Al bloquear: se quita la tarjeta, se detiene el reproductor solo si la URL en curso coincide con la de la tarjeta (getters `urlRadioSonando`/`urlTvSonando`) y se borra del `Map` local de favoritos.
+  - ✅ Panel "Bloqueos" en el sidebar (como "Mis favoritos") con estados de cargando, vacío y error; filas con tipo, `itemId`, motivo y fecha legible (`toLocaleString`, sin librerías) y botón "Desbloquear" con `window.confirm` que hace `DELETE` y quita la fila.
+  - ✅ Doble envío bloqueado (botones deshabilitados durante la petición); respuestas atrasadas ignoradas con `AbortController` + contador y comprobación de que el panel sigue visible.
+  - ✅ Todo con `createElement`/`textContent` (sin `innerHTML` con datos de la API), sin dependencias nuevas y con estilos nuevos coherentes (fondo oscuro, tarjetas translúcidas, acento dorado).
+  - ✅ Tras cada paso: `node --check` de lo tocado, `npx eslint main.js src` y `npm run build` correctos (141 módulos; CSS 11,82 kB). Solo el aviso conocido de chunks >500 kB. Tres commits locales, sin push.
+  - ⚠️ Sin verificar en navegador ni contra la API real: flujo completo con token de admin, 422/403/401 reales, desbloqueo y parada del reproductor.
 - **Entorno — Skills de OpenCode instaladas (2026-11-11)**: se instalaron de forma global (usuario, no por proyecto) las Skills `frontend-design` (oficial de Anthropic, `anthropics/skills`) y `frontend-design-systems` (`composio-community/opencode-skills`), mediante el CLI `skills` con `-g -a opencode`. Quedan en `~\.agents\skills\`, que OpenCode detecta automáticamente, así que estarán disponibles en cualquier proyecto. No se modificó ninguna configuración existente del repositorio. Relevantes para el trabajo pendiente del frontend (`front/`).
 
 ## En curso
@@ -309,6 +322,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - **Probar favoritos de radio y TV**: alta/baja del corazón, lista "Mis favoritos" y reproducción desde esa sección
 - **Probar canales HLS** en Chrome/Firefox (hls.js) y Safari/iOS (ruta nativa), incluida la pantalla completa
 - **Probar persistencia del volumen** entre recargas y el fallback 📻/📺 cuando un logo no carga
+- **Probar el panel de administrador en navegador y con la API real**: botón solo con rol admin, bloqueo (201/422 duplicado/403), panel "Bloqueos", desbloqueo y parada del reproductor si el contenido bloqueado estaba sonando
 - **Valorar el botón +18** en una etapa posterior (hoy no existe)
 - **Revisión visual**: texturas, atmósfera, hover de países, vuelo de cámara y límites de zoom
 - **Límite conocido**: algunos streams HTTP pueden ser bloqueados como contenido mixto si el front se sirve por HTTPS
@@ -450,6 +464,10 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Frontend: el `country` del favorito se toma del item y, si no es válido, del país seleccionado; antes de enviarlo se exige exactamente 2 letras mayúsculas.
 - Frontend: "Mis favoritos" es una acción del panel, no una tercera pestaña de módulo. Las tarjetas reproducen con el reproductor de radio o TV según su tipo, aunque la pestaña activa sea otra.
 - Frontend: el modal se construye con `createElement`, bloquea el globo con una capa fija, atrapa el foco mientras está abierto y lo devuelve al botón que lo abrió.
+- Frontend (admin): la visibilidad de la administración se resuelve con la clase `es-admin` en `<body>`; los botones "Bloquear" se crean siempre en las tarjetas y el CSS los muestra u oculta, de modo que las listas ya pintadas se actualizan al cambiar de sesión sin re-renderizarse. El botón "Admin" sí se crea/retira con el rol.
+- Frontend (admin): el panel se separa en `admin.js` (botón, tarjeta y formulario) y `admin-bloqueos.js` (listado y desbloqueo) para respetar el límite de ~500 líneas por archivo. El sentido de dependencia es `admin.js` → `admin-bloqueos.js`; el segundo no importa al primero.
+- Frontend (admin): al bloquear se detiene el reproductor solo si la URL que está sonando coincide con la `streamUrl` de esa tarjeta (los reproductores no exponen el `id`), y se borra el favorito local del `Map`; la API ya oculta los bloqueados en la siguiente carga.
+- Frontend (admin): un 403 nunca cierra la sesión; se muestra "No tienes permisos de administrador". El 401 se delega en `api.js`, que cierra la sesión local y avisa como en el resto de la app.
 
 ### Problemas abiertos
 

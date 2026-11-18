@@ -8,6 +8,7 @@ import { crearLogoEmisora } from './utils.js';
 import { marcarEmisoraActiva, reproducirEmisora } from './reproductor-radio.js';
 import { marcarCanalActivo, reproducirCanal } from './reproductor-tv.js';
 import { crearBotonFavorito } from './favoritos.js';
+import { crearBotonBloquear } from './admin.js';
 
 function actualizarPanel(props, datosRadio = null) {
   const iso2 = getIso2(props);
@@ -101,6 +102,11 @@ function actualizarPanel(props, datosRadio = null) {
         // El corazón solo se añade si la API dio un id real para el item.
         const corazon = crearBotonFavorito(item);
         if (corazon) li.appendChild(corazon);
+
+        // El botón de bloqueo existe siempre; el CSS lo muestra solo si el
+        // <body> tiene la clase `es-admin`.
+        const bloquear = crearBotonBloquear(item, li);
+        if (bloquear) li.appendChild(bloquear);
 
         lista.appendChild(li);
       });
@@ -229,6 +235,11 @@ function actualizarPanelTv(props, datos = null) {
     // El corazón solo se añade si la API dio un id real para el canal.
     const corazon = crearBotonFavorito(item);
     if (corazon) li.appendChild(corazon);
+
+    // El botón de bloqueo existe siempre; el CSS lo muestra solo si el
+    // <body> tiene la clase `es-admin`.
+    const bloquear = crearBotonBloquear(item, li);
+    if (bloquear) li.appendChild(bloquear);
 
     lista.appendChild(li);
   });

@@ -653,6 +653,264 @@ nav {
   display: none;
 }
 
+/* --- Administrador: botón, bloqueo y panel de bloqueos --- */
+
+/* El botón Admin y los botones Bloquear solo se ven con sesión de admin.
+   La clase vive en <body> para que las tarjetas ya dibujadas se actualicen
+   solas sin reconstruir la lista. */
+.btn-admin,
+.btn-bloquear {
+  display: none;
+}
+
+body.es-admin .btn-admin,
+body.es-admin .btn-bloquear {
+  display: inline-flex;
+}
+
+/* Botón Bloquear dentro de la tarjeta: mismo patrón que el corazón. */
+.btn-bloquear {
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  margin: 0 6px 0 0;
+  padding: 3px 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 153, 153, 0.35);
+  border-radius: 6px;
+  color: #ffb3b3;
+  font: inherit;
+  font-size: 0.68rem;
+  line-height: 1;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+
+.btn-bloquear:hover {
+  color: #ffd700;
+  background: rgba(255, 215, 0, 0.08);
+  border-color: rgba(255, 215, 0, 0.4);
+}
+
+.btn-bloquear:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.btn-bloquear:focus-visible,
+.btn-desbloquear:focus-visible,
+.bloqueo-cancelar:focus-visible,
+.bloqueo-confirmar:focus-visible,
+.modal-bloqueo__cerrar:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
+}
+
+/* Panel de bloqueos: reutiliza la tarjeta base de .emisora. */
+.bloqueo-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.bloqueo-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 8px 10px;
+}
+
+.bloqueo-titulo {
+  font-size: 0.8rem;
+  color: #e0e0e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bloqueo-motivo {
+  font-size: 0.72rem;
+  color: #c9c9e0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bloqueo-fecha {
+  font-size: 0.66rem;
+  color: #8f9bb3;
+}
+
+.btn-desbloquear {
+  flex: 0 0 auto;
+  margin: 0 6px 0 0;
+  padding: 4px 8px;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.35);
+  border-radius: 6px;
+  color: #ffd700;
+  font: inherit;
+  font-size: 0.68rem;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-desbloquear:hover {
+  background: rgba(255, 215, 0, 0.16);
+}
+
+.btn-desbloquear:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+/* Modal del formulario de bloqueo (mismo lenguaje que el modal de auth). */
+.modal-bloqueo {
+  position: fixed;
+  inset: 0;
+  z-index: 320;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 4, 10, 0.74);
+  backdrop-filter: blur(3px);
+}
+
+.modal-bloqueo[hidden] {
+  display: none;
+}
+
+.modal-bloqueo__dialog {
+  position: relative;
+  width: min(380px, 100%);
+  padding: 20px;
+  background: rgba(16, 16, 28, 0.98);
+  border: 1px solid #3a3a5a;
+  border-radius: 12px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+}
+
+.modal-bloqueo__cerrar {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #aaa;
+  font: inherit;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.modal-bloqueo__cerrar:hover {
+  color: #e0e0e0;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.modal-bloqueo__titulo {
+  margin-bottom: 6px;
+  padding-right: 32px;
+  color: #ffd700;
+  font-size: 1.1rem;
+}
+
+.modal-bloqueo__detalle {
+  margin-bottom: 12px;
+  color: #c9c9e0;
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+
+.bloqueo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.bloqueo-label {
+  font-size: 0.78rem;
+  color: #c9c9e0;
+}
+
+.bloqueo-form textarea {
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #4a4a7a;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font: inherit;
+  font-size: 0.9rem;
+  resize: vertical;
+}
+
+.bloqueo-form textarea:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 1px;
+}
+
+.bloqueo-form textarea[aria-invalid="true"] {
+  border-color: #ff9999;
+}
+
+.bloqueo-error {
+  min-height: 1em;
+  color: #ff9999;
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
+.bloqueo-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.bloqueo-cancelar {
+  padding: 7px 14px;
+  background: transparent;
+  border: 1px solid #4a4a7a;
+  border-radius: 6px;
+  color: #c9c9e0;
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+
+.bloqueo-cancelar:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.bloqueo-confirmar {
+  padding: 7px 16px;
+  background: #ffd700;
+  border: 1px solid #ffd700;
+  border-radius: 6px;
+  color: #1a1a2a;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.bloqueo-confirmar:hover {
+  background: #ffe34d;
+}
+
+.bloqueo-confirmar:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
 @media (max-width: 640px) {
   #toolbar {
     gap: 6px;

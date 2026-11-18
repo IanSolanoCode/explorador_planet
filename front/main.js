@@ -7,6 +7,7 @@ import { initGlobe } from './src/globo.js';
 import { setupToolbar } from './src/toolbar.js';
 import { inicializarSesion, leerToken, cerrarSesionLocal } from './src/auth.js';
 import { setupCuenta } from './src/cuenta.js';
+import { setupAdmin } from './src/admin.js';
 import { abrirModalAuth } from './src/modal-auth.js';
 import { cargarVolumen } from './src/utils.js';
 
@@ -28,6 +29,8 @@ async function init() {
   configurarAperturaAuth(abrirModalAuth);
   setupCuenta();
   setupFavoritos();
+  // Administración: crea el botón "Admin" y conecta el estado de sesión.
+  setupAdmin();
 
   // La validación de sesión y la carga de favoritos no bloquean el globo.
   inicializarSesion().catch((err) => {
