@@ -242,6 +242,13 @@ function reproducirEmisora(streamUrl, nombre, logo) {
   }
 }
 
+// URL de la emisora que está en reproducción ahora ('' si no hay ninguna).
+// Permite a la administración comprobar que el contenido a bloquear es
+// justo el que suena antes de detenerlo.
+function urlRadioSonando() {
+  return emisoraActual ? emisoraActual.url : '';
+}
+
 /**
  * Detiene la reproducción, libera el stream y oculta el mini reproductor.
  */
@@ -278,4 +285,5 @@ export {
   detenerAudio,
   marcarEmisoraActiva,
   ajustarVolumenAudio,
+  urlRadioSonando,
 };

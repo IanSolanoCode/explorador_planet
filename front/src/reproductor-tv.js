@@ -352,5 +352,12 @@ async function reproducirCanal(streamUrl, nombre) {
 
 
 
+// URL del canal que está en reproducción ahora ('' si no hay ninguno).
+// Permite a la administración comprobar que el contenido a bloquear es
+// justo el que suena antes de detenerlo.
+function urlTvSonando() {
+  return canalActual ? canalActual.url : '';
+}
+
 // Se registra dentro de crearReproductorTv(), que llama init().
-export { crearReproductorTv, reproducirCanal, detenerTv, marcarCanalActivo };
+export { crearReproductorTv, reproducirCanal, detenerTv, marcarCanalActivo, urlTvSonando };
