@@ -25,6 +25,8 @@ function crearCampoAuth({ id, nombre, etiqueta, tipo = 'text', autocomplete }) {
   input.type = tipo;
   input.autocomplete = autocomplete;
   input.setAttribute('aria-describedby', `${id}-error`);
+  // Con el teclado abierto, centra el campo para no perderlo bajo él.
+  input.addEventListener('focus', () => input.scrollIntoView({ block: 'center' }));
 
   const error = document.createElement('p');
   error.id = `${id}-error`;

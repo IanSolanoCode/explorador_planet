@@ -176,6 +176,8 @@ function crearModalBloqueo() {
   input.maxLength = MAX_MOTIVO;
   input.required = true;
   input.setAttribute('aria-describedby', 'bloqueo-error');
+  // Con el teclado abierto, centra el campo para no perderlo bajo él.
+  input.addEventListener('focus', () => input.scrollIntoView({ block: 'center' }));
 
   const error = document.createElement('p');
   error.id = 'bloqueo-error';

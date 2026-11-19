@@ -1139,3 +1139,88 @@ body.es-admin .btn-bloquear {
     }
   }
 }
+
+/* --- Modales y tarjetas en móvil --- */
+@media (max-width: 767px) {
+  .modal-auth {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-auth__dialog {
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    max-height: 92dvh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 16px 16px 0 0;
+    padding: 22px 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-auth__titulo,
+  .auth-tabs {
+    flex: 0 0 auto;
+  }
+
+  .auth-form {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .auth-acciones {
+    position: sticky;
+    bottom: 0;
+    padding: 8px 0 4px;
+    background: rgba(16, 16, 28, 0.98);
+  }
+
+  /* 16px evita el zoom automático de iOS al enfocar. */
+  .auth-campo input,
+  .bloqueo-form textarea {
+    font-size: 16px;
+  }
+
+  .modal-bloqueo {
+    align-items: flex-end;
+    padding: 0;
+  }
+
+  .modal-bloqueo__dialog {
+    width: 100%;
+    max-width: 100%;
+    border-radius: 16px 16px 0 0;
+    padding: 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Botones de tarjeta con zona táctil suficiente y separados. */
+  .btn-favorito {
+    width: 44px;
+    height: 44px;
+    margin: 0 4px 0 0;
+  }
+
+  .btn-bloquear,
+  .btn-desbloquear {
+    min-height: 44px;
+  }
+
+  .btn-bloquear {
+    padding: 6px 10px;
+  }
+}
+
+/* --- Movimiento reducido: se desactivan las transiciones de panel y
+   reproductores. --- */
+@media (prefers-reduced-motion: reduce) {
+  aside,
+  .reproductor {
+    transition: none;
+  }
+}
