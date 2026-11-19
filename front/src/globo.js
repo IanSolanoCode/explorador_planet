@@ -128,7 +128,50 @@ async function initGlobe() {
   escribirEstado('globe', globe);
   aplicarEstilos();
   configurarControles();
+  configurarRedimensionado();
   leerEstado('globe').renderer().setPixelRatio(Math.min(window.devicePixelRatio, 2));
+}
+
+// Redimensiona el globo al cambiar el tamaño del contenedor (#globe) o al girar
+// el dispositivo. globe.gl no se redimensiona solo; expone width() y height()
+// (getter/setter). Un ResizeObserver con requestAnimationFrame evita saturar el
+// hilo con llamadas seguidas.
+function configurarRedimensionado() {
+  const contenedor = document.getElementById('globe');
+  if (!contenedor) return;
+
+  let frame = 0;
+
+  const redimensionar = () => {
+    if (frame) cancelAnimationFrame(frame);
+    frame = requestAnimationFrame(() => {
+      frame = 0;
+      const globe = leerEstado('globe');
+      if (!globe) return;
+      const ancho = contenedor.clientWidth;
+      const alto = contenedor.clientHeight;
+      if (ancho > 0 && alto > 0) globe.width(ancho).height(alto);
+    });
+  };
+
+  let observer = null;
+  if (typeof ResizeObserver !== 'undefined') {
+    observer = new ResizeObserver(redimensionar);
+    observer.observe(contenedor);
+  }
+
+  // Al girar, las unidades dvh tardan unos ms en asentarse: se recalcula dos veces.
+  const trasGiro = () => {
+    redimensionar();
+    setTimeout(redimensionar, 250);
+  };
+  window.addEventListener('orientationchange', trasGiro);
+
+  // Referencia para desconectar si el globo llegara a destruirse.
+  escribirEstado('_redimensionado', { observer, desconectar: () => {
+    if (observer) observer.disconnect();
+    window.removeEventListener('orientationchange', trasGiro);
+  } });
 }
 
 // Controles de cámara: inercia, zoom limitado y rotación que se pausa al interactuar

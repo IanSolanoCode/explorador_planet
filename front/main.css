@@ -9,12 +9,15 @@ body {
   background: #0a0a0f;
   color: #e0e0e0;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
+  overscroll-behavior: none;
 }
 
 #globe {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
 }
 
 aside {
@@ -297,17 +300,26 @@ aside p {
 
 nav {
   position: fixed;
-  top: 20px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0;
+  left: 0;
+  right: 0;
+  transform: none;
   display: flex;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
   z-index: 100;
-  margin-top: 8px;
+  padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px;
 }
 
 .tab-btn {
   padding: 8px 16px;
+  min-height: 44px;
+  min-width: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background: rgba(50, 50, 80, 0.5);
   border: 1px solid #4a4a7a;
   border-radius: 4px;
@@ -332,7 +344,7 @@ nav {
 #toolbar {
   flex-wrap: wrap;
   justify-content: center;
-  max-width: calc(100vw - 40px);
+  max-width: calc(100vw - 24px);
 }
 
 .accion-btn.activo,
@@ -923,5 +935,24 @@ body.es-admin .btn-bloquear {
 
   .modal-auth__dialog {
     padding: 18px;
+  }
+}
+
+/* --- Diseño responsivo (mobile-first) ---
+   Base = pantallas angostas; @media (min-width) restaura tablet/escritorio. */
+
+@media (min-width: 768px) {
+  nav {
+    top: 20px;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    padding: 0;
+    gap: 12px;
+    margin-top: 8px;
+  }
+
+  #toolbar {
+    max-width: calc(100vw - 40px);
   }
 }
