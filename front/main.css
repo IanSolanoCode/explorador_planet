@@ -24,10 +24,10 @@ aside {
   position: fixed;
   left: 0;
   right: 0;
-  bottom: 0;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + var(--altura-reproductor, 0px));
   top: auto;
   width: auto;
-  max-height: 55dvh;
+  max-height: min(55dvh, calc(100dvh - var(--altura-barra, 0px) - var(--altura-reproductor, 0px)));
   overflow-y: auto;
   overscroll-behavior: contain;
   background: rgba(10, 10, 15, 0.92);
@@ -45,8 +45,9 @@ aside.hidden {
   transform: translateY(105%);
 }
 
-/* Plegada: asoma solo el asa, conservando el contenido. */
-aside.plegada {
+/* Plegada (manual o automática): asoma solo el asa, conservando el contenido. */
+aside.plegada,
+aside.auto-plegada {
   max-height: 56px;
   padding-top: 10px;
   padding-bottom: 10px;
@@ -1078,11 +1079,11 @@ body.es-admin .btn-bloquear {
   aside {
     left: auto;
     right: 0;
-    bottom: 0;
+    bottom: var(--altura-reproductor, 0px);
     top: 0;
     width: 320px;
     max-height: none;
-    height: 100%;
+    height: auto;
     border-bottom: 1px solid #3a3a5a;
     border-radius: 0;
     padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
@@ -1092,8 +1093,9 @@ body.es-admin .btn-bloquear {
     transform: translateX(105%);
   }
 
-  aside.plegada {
-    height: 100%;
+  aside.plegada,
+  aside.auto-plegada {
+    height: auto;
     max-height: none;
   }
 
@@ -1120,25 +1122,11 @@ body.es-admin .btn-bloquear {
   }
 }
 
-/* --- Apilado hoja + barra de radio (solo móvil retrato) --- */
+/* --- Alturas medidas por JS (ResizeObserver): reproductor y barra superior.
+   La hoja usa estas variables para no quedar detrás del reproductor. --- */
 :root {
   --altura-reproductor: 0px;
-}
-
-@media (max-width: 767px) {
-  /* Caso moderno: :has() detecta la barra de radio visible y sube la hoja. */
-  @supports selector(:has(*)) {
-    body:has(#radio-player:not([hidden])) aside:not(.plegada) {
-      bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
-    }
-  }
-
-  /* Caso sin :has(): JS mantiene --altura-reproductor al mostrar/ocultar radio. */
-  @supports not selector(:has(*)) {
-    aside:not(.plegada) {
-      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--altura-reproductor, 0px));
-    }
-  }
+  --altura-barra: 0px;
 }
 
 /* --- Modales y tarjetas en móvil --- */
