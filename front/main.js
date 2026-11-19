@@ -11,6 +11,7 @@ import { setupAdmin } from './src/admin.js';
 import { abrirModalAuth } from './src/modal-auth.js';
 import { cargarVolumen } from './src/utils.js';
 import { iniciarHoja } from './src/hoja.js';
+import { instalarEscapeReproductor } from './src/reproductor-ui.js';
 
 // --- Inicialización de la aplicación ---
 
@@ -26,6 +27,7 @@ async function init() {
   crearReproductor();
   crearReproductorTv();
   iniciarHoja();
+  instalarEscapeReproductor();
   setupToolbar();
   // Favoritos no importa el modal: recibe la función que lo abre.
   configurarAperturaAuth(abrirModalAuth);

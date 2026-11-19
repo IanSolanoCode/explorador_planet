@@ -18,6 +18,9 @@ const estado = {
   peticionFavoritosActual: 0,
   vistaFavoritos: false,
   volumenRecordado: VOLUMEN_POR_DEFECTO, // 0–1; se carga en init()
+  // ¿El reproductor activo está minimizado? Preferencia única compartida por
+  // radio y TV; se conserva al cambiar de canal y al pasar de uno a otro.
+  reproductorMinimizado: false,
 };
 
 export function leerEstado(clave) {

@@ -5,6 +5,12 @@
 import { escribirEstado, leerEstado } from './estado.js';
 import { crearLogoEmisora, guardarVolumen } from './utils.js';
 import { detenerRegistrado, registrarDetenedor } from './registro.js';
+import {
+  crearBotonCerrar,
+  crearBotonMinimizar,
+  aplicarMinimizado,
+  alternarMinimizado,
+} from './reproductor-ui.js';
 
 let audioActual = null;
 let emisoraActual = null; // { nombre, url, logo } que suena ahora
@@ -37,14 +43,14 @@ function crearReproductor() {
 
   const btnPausa = document.createElement('button');
   btnPausa.type = 'button';
-  btnPausa.className = 'btn-control';
+  btnPausa.className = 'btn-control reproductor-pausa';
   btnPausa.setAttribute('aria-label', 'Pausar');
   btnPausa.textContent = '⏸';
   btnPausa.addEventListener('click', alternarPausa);
 
   const btnMute = document.createElement('button');
   btnMute.type = 'button';
-  btnMute.className = 'btn-control';
+  btnMute.className = 'btn-control reproductor-mute';
   btnMute.setAttribute('aria-label', 'Silenciar');
   btnMute.setAttribute('aria-pressed', 'false');
   btnMute.textContent = '🔊';
@@ -66,10 +72,14 @@ function crearReproductor() {
 
   const btnDetener = document.createElement('button');
   btnDetener.type = 'button';
-  btnDetener.className = 'btn-control';
+  btnDetener.className = 'btn-control btn-detener reproductor-detener';
   btnDetener.setAttribute('aria-label', 'Detener');
   btnDetener.textContent = '⏹';
   btnDetener.addEventListener('click', detenerAudio);
+
+  // Minimizar y cerrar: se crean aquí para compartir el estado minimizado.
+  const btnMinimizar = crearBotonMinimizar(() => alternarMinimizado(contenedor, btnMinimizar));
+  const btnCerrar = crearBotonCerrar(detenerAudio);
 
   info.appendChild(nombre);
   info.appendChild(estado);
@@ -77,14 +87,18 @@ function crearReproductor() {
   controles.appendChild(btnMute);
   controles.appendChild(volumen);
   controles.appendChild(btnDetener);
+  controles.appendChild(btnMinimizar);
   contenedor.appendChild(logo);
   contenedor.appendChild(info);
   contenedor.appendChild(controles);
+  contenedor.appendChild(btnCerrar);
   document.body.appendChild(contenedor);
 
-  reproductorEls = { contenedor, logo, nombre, estado, btnPausa, btnMute, volumen, btnDetener };
+  reproductorEls = { contenedor, logo, nombre, estado, btnPausa, btnMute, volumen, btnDetener, btnMinimizar, btnCerrar };
   // La TV se detiene mediante este registro, sin importar su módulo.
   registrarDetenedor('radio', detenerAudio);
+
+  aplicarMinimizado(contenedor, btnMinimizar);
 }
 
 function setEstadoReproductor(estado) {
@@ -186,9 +200,9 @@ function reproducirEmisora(streamUrl, nombre, logo) {
   emisoraActual = { nombre, url: streamUrl, logo: logo || '' };
 
   reproductorEls.contenedor.hidden = false;
-  // Respaldo sin :has(): la hoja sube por encima de la barra de radio.
-  document.documentElement.style.setProperty('--altura-reproductor', '64px');
   reproductorEls.nombre.textContent = nombre;
+  // Hereda la preferencia minimizada compartida (no se resetea al cambiar).
+  aplicarMinimizado(reproductorEls.contenedor, reproductorEls.btnMinimizar);
   actualizarLogoReproductor(logo);
   setEstadoReproductor('conectando');
   marcarEmisoraActiva();
@@ -275,7 +289,8 @@ function detenerAudio() {
   if (reproductorEls) {
     reproductorEls.contenedor.hidden = true;
     setEstadoReproductor('inactivo');
-    document.documentElement.style.setProperty('--altura-reproductor', '0px');
+    // Limpia la clase minimizado (la X ya reseteó la preferencia).
+    aplicarMinimizado(reproductorEls.contenedor, reproductorEls.btnMinimizar);
   }
 }
 

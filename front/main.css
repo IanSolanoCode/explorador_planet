@@ -201,6 +201,7 @@ aside p {
   border-radius: 0;
   backdrop-filter: blur(10px);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
+  transition: width 0.2s ease, height 0.2s ease, padding 0.2s ease;
 }
 
 .reproductor[hidden] {
@@ -1222,5 +1223,100 @@ body.es-admin .btn-bloquear {
   aside,
   .reproductor {
     transition: none;
+  }
+}
+
+/* --- Reproductor: botón cerrar (X) y minimizar --- */
+
+/* X del reproductor. En la barra de radio fluye al final; en TV flota. */
+.reproductor-cerrar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid #4a4a7a;
+  border-radius: 6px;
+  color: #e0e0e0;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+}
+
+.reproductor-cerrar:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: #6a6a9a;
+}
+
+.reproductor-cerrar:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
+}
+
+/* En TV la X flota sobre el vídeo (también en pantalla completa y miniatura). */
+.reproductor--tv .reproductor-cerrar {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  z-index: 2;
+  background: rgba(10, 10, 15, 0.72);
+}
+
+@media (max-width: 767px) {
+  /* "Detener" es redundante con la X en móvil. */
+  .btn-detener {
+    display: none;
+  }
+
+  /* Radio minimizada: barra delgada (nombre + pausa + minimizar + X). */
+  .reproductor.minimizado .reproductor-logo,
+  .reproductor.minimizado .reproductor-estado,
+  .reproductor.minimizado .reproductor-mute,
+  .reproductor.minimizado .volumen,
+  .reproductor.minimizado .reproductor-detener {
+    display: none;
+  }
+
+  /* TV minimizada: miniatura 140x16:9 en la esquina inferior derecha. */
+  .reproductor--tv.minimizado {
+    left: auto;
+    right: 12px;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+    width: 140px;
+    padding: 0;
+    gap: 0;
+    border-radius: 8px;
+    overflow: hidden;
+    cursor: pointer;
+  }
+
+  .reproductor--tv.minimizado .tv-pantalla {
+    width: 140px;
+    aspect-ratio: 16 / 9;
+  }
+
+  .reproductor--tv.minimizado .reproductor-info,
+  .reproductor--tv.minimizado .reproductor-mute,
+  .reproductor--tv.minimizado .reproductor-pantalla,
+  .reproductor--tv.minimizado .reproductor-detener,
+  .reproductor--tv.minimizado .reproductor-minimizar,
+  .reproductor--tv.minimizado .volumen {
+    display: none;
+  }
+
+  .reproductor--tv.minimizado .reproductor-controles {
+    position: absolute;
+    bottom: 4px;
+    left: 0;
+    right: 0;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .reproductor--tv.minimizado .reproductor-pausa {
+    pointer-events: auto;
   }
 }

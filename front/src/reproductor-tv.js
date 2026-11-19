@@ -6,6 +6,12 @@ import { escribirEstado, leerEstado } from './estado.js';
 import { guardarVolumen } from './utils.js';
 import { detenerRegistrado, registrarDetenedor } from './registro.js';
 import { ajustarVolumenAudio } from './reproductor-radio.js';
+import {
+  crearBotonCerrar,
+  crearBotonMinimizar,
+  aplicarMinimizado,
+  alternarMinimizado,
+} from './reproductor-ui.js';
 
 // TV: estado independiente del reproductor de radio.
 let videoActual = null;
@@ -144,14 +150,14 @@ function crearReproductorTv() {
 
   const btnPausa = document.createElement('button');
   btnPausa.type = 'button';
-  btnPausa.className = 'btn-control';
+  btnPausa.className = 'btn-control reproductor-pausa';
   btnPausa.setAttribute('aria-label', 'Pausar');
   btnPausa.textContent = '⏸';
   btnPausa.addEventListener('click', alternarPausaTv);
 
   const btnMute = document.createElement('button');
   btnMute.type = 'button';
-  btnMute.className = 'btn-control';
+  btnMute.className = 'btn-control reproductor-mute';
   btnMute.setAttribute('aria-label', 'Silenciar');
   btnMute.setAttribute('aria-pressed', 'false');
   btnMute.textContent = '🔊';
@@ -174,7 +180,7 @@ function crearReproductorTv() {
 
   const btnPantalla = document.createElement('button');
   btnPantalla.type = 'button';
-  btnPantalla.className = 'btn-control';
+  btnPantalla.className = 'btn-control reproductor-pantalla';
   btnPantalla.setAttribute('aria-label', 'Pantalla completa');
   btnPantalla.textContent = '⛶';
   btnPantalla.addEventListener('click', alternarPantallaCompleta);
@@ -183,10 +189,14 @@ function crearReproductorTv() {
 
   const btnDetener = document.createElement('button');
   btnDetener.type = 'button';
-  btnDetener.className = 'btn-control';
+  btnDetener.className = 'btn-control btn-detener reproductor-detener';
   btnDetener.setAttribute('aria-label', 'Detener');
   btnDetener.textContent = '⏹';
   btnDetener.addEventListener('click', detenerTv);
+
+  // Minimizar y cerrar: comparten la preferencia minimizada con la radio.
+  const btnMinimizar = crearBotonMinimizar(() => alternarMinimizado(contenedor, btnMinimizar));
+  const btnCerrar = crearBotonCerrar(detenerTv);
 
   info.appendChild(nombre);
   info.appendChild(estado);
@@ -195,10 +205,20 @@ function crearReproductorTv() {
   controles.appendChild(volumen);
   controles.appendChild(btnPantalla);
   controles.appendChild(btnDetener);
+  controles.appendChild(btnMinimizar);
   contenedor.appendChild(pantalla);
   contenedor.appendChild(info);
   contenedor.appendChild(controles);
+  contenedor.appendChild(btnCerrar);
   document.body.appendChild(contenedor);
+
+  // Con la miniatura (minimizado), un toque fuera de los botones expande.
+  contenedor.addEventListener('click', (evento) => {
+    if (!contenedor.classList.contains('minimizado')) return;
+    if (evento.target.closest('button')) return;
+    escribirEstado('reproductorMinimizado', false);
+    aplicarMinimizado(contenedor, btnMinimizar);
+  });
 
   // Refleja el estado real de pantalla completa en el aria-label.
   document.addEventListener('fullscreenchange', () => {
@@ -219,9 +239,13 @@ function crearReproductorTv() {
     volumen,
     btnPantalla,
     btnDetener,
+    btnMinimizar,
+    btnCerrar,
   };
   // La radio se detiene mediante este registro, sin importar su módulo.
   registrarDetenedor('tv', detenerTv);
+
+  aplicarMinimizado(contenedor, btnMinimizar);
 }
 
 // Libera hls.js y el <video> actual sin tocar la visibilidad del reproductor.
@@ -262,6 +286,8 @@ function detenerTv() {
   if (reproductorTvEls) {
     reproductorTvEls.contenedor.hidden = true;
     setEstadoTv('inactivo');
+    // Limpia la clase minimizado (la X ya reseteó la preferencia).
+    aplicarMinimizado(reproductorTvEls.contenedor, reproductorTvEls.btnMinimizar);
   }
 }
 
@@ -294,6 +320,8 @@ async function reproducirCanal(streamUrl, nombre) {
   canalActual = { nombre, url: streamUrl };
   reproductorTvEls.contenedor.hidden = false;
   reproductorTvEls.nombre.textContent = nombre;
+  // Hereda la preferencia minimizada compartida (no se resetea al cambiar).
+  aplicarMinimizado(reproductorTvEls.contenedor, reproductorTvEls.btnMinimizar);
   setEstadoTv('conectando');
   marcarCanalActivo();
 
