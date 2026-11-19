@@ -10,6 +10,7 @@ import { setupCuenta } from './src/cuenta.js';
 import { setupAdmin } from './src/admin.js';
 import { abrirModalAuth } from './src/modal-auth.js';
 import { cargarVolumen } from './src/utils.js';
+import { iniciarHoja } from './src/hoja.js';
 
 // --- Inicialización de la aplicación ---
 
@@ -24,6 +25,7 @@ async function init() {
   await initGlobe();
   crearReproductor();
   crearReproductorTv();
+  iniciarHoja();
   setupToolbar();
   // Favoritos no importa el modal: recibe la función que lo abre.
   configurarAperturaAuth(abrirModalAuth);

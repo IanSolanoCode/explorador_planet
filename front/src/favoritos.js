@@ -8,6 +8,7 @@ import { crearLogoEmisora } from './utils.js';
 import { mostrarAviso, peticionApi } from './api.js';
 import { reproducirEmisora } from './reproductor-radio.js';
 import { reproducirCanal } from './reproductor-tv.js';
+import { mostrarHoja } from './hoja.js';
 
 let controladorFavoritos = null;
 // Asocia cada corazón con su item para poder actualizarlo sin re-renderizar listas.
@@ -297,6 +298,7 @@ function renderFavoritosPanel(estado = {}) {
   sidebar.classList.remove('hidden');
   sidebar.querySelectorAll('.emisoras, .canales').forEach((lista) => lista.remove());
   countryName.textContent = 'Mis favoritos';
+  mostrarHoja();
 
   if (estado.sinSesion) {
     codigo.textContent = 'Inicia sesión para ver tus favoritos.';

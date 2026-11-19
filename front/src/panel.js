@@ -9,6 +9,7 @@ import { marcarEmisoraActiva, reproducirEmisora } from './reproductor-radio.js';
 import { marcarCanalActivo, reproducirCanal } from './reproductor-tv.js';
 import { crearBotonFavorito } from './favoritos.js';
 import { crearBotonBloquear } from './admin.js';
+import { mostrarHoja } from './hoja.js';
 
 function actualizarPanel(props, datosRadio = null) {
   const iso2 = getIso2(props);
@@ -126,6 +127,7 @@ function actualizarPanel(props, datosRadio = null) {
 
   // Asegurar que el panel sea visible
   sidebar.classList.remove('hidden');
+  mostrarHoja();
 }
 
 // Pinta el panel en modo TV con los mismos estados que radio.
@@ -136,6 +138,8 @@ function actualizarPanelTv(props, datos = null) {
   const codigo = document.getElementById('country-code');
   const countryName = document.getElementById('country-name');
   const sidebar = document.getElementById('country-info');
+
+  mostrarHoja();
 
   // Quitar listas anteriores (radio o TV) para no mezclar modos.
   sidebar.querySelectorAll('.emisoras, .canales').forEach((lista) => lista.remove());

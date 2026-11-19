@@ -22,22 +22,86 @@ body {
 
 aside {
   position: fixed;
-  right: 20px;
-  top: 20px;
-  width: 260px;
-  max-height: calc(100vh - 100px);
+  left: 0;
+  right: 0;
+  bottom: 0;
+  top: auto;
+  width: auto;
+  max-height: 55dvh;
   overflow-y: auto;
-  background: rgba(10, 10, 15, 0.8);
+  overscroll-behavior: contain;
+  background: rgba(10, 10, 15, 0.92);
   border: 1px solid #3a3a5a;
-  border-radius: 8px;
+  border-bottom: 0;
+  border-radius: 16px 16px 0 0;
   padding: 20px;
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   backdrop-filter: blur(10px);
   z-index: 100;
-  transition: transform 0.3s ease;
+  transition: transform 0.3s ease, max-height 0.3s ease;
 }
 
 aside.hidden {
-  transform: translateX(300px);
+  transform: translateY(105%);
+}
+
+/* Plegada: asoma solo el asa, conservando el contenido. */
+aside.plegada {
+  max-height: 56px;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+/* Asa de la hoja: botón real con aria-expanded; barra visual centrada. */
+.hoja-asa {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 28px;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+}
+
+.hoja-asa::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.4);
+}
+
+.hoja-cerrar {
+  position: absolute;
+  top: 4px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  color: #aaa;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.hoja-cerrar:hover {
+  color: #e0e0e0;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.hoja-asa:focus-visible,
+.hoja-cerrar:focus-visible {
+  outline: 2px solid #ffd700;
+  outline-offset: 2px;
 }
 
 aside h3 {
@@ -60,8 +124,8 @@ aside p {
   gap: 6px;
   margin: 8px 0 0;
   padding: 0;
-  max-height: 200px;
-  overflow-y: auto;
+  max-height: none;
+  overflow-y: visible;
 }
 
 .emisora {
@@ -954,5 +1018,36 @@ body.es-admin .btn-bloquear {
 
   #toolbar {
     max-width: calc(100vw - 40px);
+  }
+
+  aside {
+    left: auto;
+    right: 20px;
+    bottom: auto;
+    top: 20px;
+    width: 260px;
+    max-height: calc(100vh - 100px);
+    max-height: calc(100dvh - 100px);
+    border-bottom: 1px solid #3a3a5a;
+    border-radius: 8px;
+    padding: 20px;
+  }
+
+  aside.hidden {
+    transform: translateX(300px);
+  }
+
+  aside.plegada {
+    max-height: calc(100vh - 100px);
+  }
+
+  .hoja-asa,
+  .hoja-cerrar {
+    display: none;
+  }
+
+  .emisoras {
+    max-height: 200px;
+    overflow-y: auto;
   }
 }

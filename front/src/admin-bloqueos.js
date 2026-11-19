@@ -5,6 +5,7 @@
 import { leerEstado } from './estado.js';
 import { mostrarAviso, peticionApi } from './api.js';
 import { marcarVistaFavoritos } from './favoritos.js';
+import { mostrarHoja } from './hoja.js';
 
 let controladorBloqueos = null;
 let generacionBloqueos = 0;
@@ -105,6 +106,7 @@ function renderBloqueosPanel(estado = {}) {
   // limpien al pintar otra vista.
   sidebar.querySelectorAll('.emisoras, .canales').forEach((lista) => lista.remove());
   countryName.textContent = 'Bloqueos';
+  mostrarHoja();
 
   if (estado.sinPermiso) {
     codigo.textContent = 'No tienes permisos de administrador';
