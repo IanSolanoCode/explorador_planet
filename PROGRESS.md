@@ -6,6 +6,7 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
 ## Hecho
 
+- **Atlas — descartado (2026-11-18)**: se eliminó el módulo de atlas (endpoint `/api/countries/{code}/atlas`, `AtlasController`, `CountryResource` y `RestCountriesService`). El proyecto queda con dos módulos: radio y TV.
 - **Verificación de streams caídos (TV) — hecho (2026-11-18)**:
   - Migración `stream_checks` y modelo `StreamCheck`: `item_id`, `stream_url` (único par), `is_alive`, `consecutive_failures`, `http_status`, `error`, `checked_at`, `last_ok_at`; índice en `checked_at`. Migrada en desarrollo y en `explorador_planet_test`.
   - `IptvOrgService::allStreamPairs()`: pares `(item_id, streamUrl, country)` de todos los países con una sola descarga y caché propia de 6 h (`iptv:tv:pairs`). Reutiliza los mismos filtros que `channelsByCountry`. Pico medido: 9 807 pares, 102 MiB con `memory_limit=128M` (sin necesidad de trocear).
@@ -30,20 +31,20 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Proyecto Laravel 13.39 limpio instalado en `api/` (PHP 8.4), en modo API: solo `routes/api.php`, sin rutas web, vistas ni assets de frontend.
 - `api/.env.example` configurado para MySQL (base `explorador_planet`). Sin migraciones ejecutadas ni tablas propias.
 - Servidor de desarrollo levantado con `php artisan serve`; `/up` responde 200.
-- Endpoints de ejemplo: `GET /api/countries/{code}/atlas`, `/radio` y `/tv`.
-- Un controlador por módulo (`AtlasController`, `RadioController`, `TvController`); TV y radio usan datos reales y atlas conserva mocks.
-- API Resources: `CountryResource`, `RadioStationResource`, `TvChannelResource`.
-- Services: `RadioBrowserService` y `IptvOrgService` implementados; `RestCountriesService` sigue vacío.
+- Endpoints de ejemplo: `GET /api/countries/{code}/radio` y `/tv`.
+- Un controlador por módulo (`RadioController`, `TvController`); TV y radio usan datos reales.
+- API Resources: `RadioStationResource` y `TvChannelResource`.
+- Services: `RadioBrowserService` y `IptvOrgService` implementados.
 - CORS habilitado en `config/cors.php` para `api/*`.
 - Validación de `{code}`: exactamente 2 letras; si no, `422` con mensaje claro en español.
-- Pruebas con curl de los tres endpoints (MX, códigos inválidos y atlas sin datos). En esa fecha aún no había migraciones ni modelos.
+- Pruebas con curl de los endpoints (MX y códigos inválidos). En esa fecha aún no había migraciones ni modelos.
 - Módulo de radio conectado a Radio Browser: `RadioBrowserService` consulta `/json/stations/bycountrycodeexact/{code}` con `hidebroken=true`, `order=votes`, `reverse=true` y `limit=50`.
 - `RadioBrowserService` usa un User-Agent propio, timeout de conexión y respuesta de 5 s, y rotación de servidores (descubrimiento por DNS de `all.api.radio-browser.info` y respaldo `de1`/`de2`, en orden aleatorio).
 - Normalización de emisoras: `stationuuid`→`id`, `name` con `trim`, `countrycode`→`country`, `url_resolved`→`streamUrl`, `favicon`→`logo` y `tags` separadas por coma, sin duplicados y con máximo de 5.
 - Caché de radio de 6 horas por país en el store `file`, con clave `radio-browser:stations:{CODE}`. También se cachea el resultado vacío para no repetir consultas.
 - `RadioController` ya no usa mocks: si todos los servidores fallan responde `502` con `message` y `error: radio_browser_unavailable`; si el país no tiene emisoras responde `200` con `data: []`.
-- Mocks de radio eliminados; los mocks de atlas siguen intactos.
-- Pruebas con curl del módulo de radio: PE y CO devuelven 50 emisoras; BV, TK y ZZ devuelven `200` con `data: []`; MEX y 1 devuelven `422`; fallo simulado de todos los servidores devuelve `502` y la recuperación posterior vuelve a `200`. Caché verificada con expiración de ~6 h y TV/atlas sin cambios.
+- Mocks de radio eliminados.
+- Pruebas con curl del módulo de radio: PE y CO devuelven 50 emisoras; BV, TK y ZZ devuelven `200` con `data: []`; MEX y 1 devuelven `422`; fallo simulado de todos los servidores devuelve `502` y la recuperación posterior vuelve a `200`. Caché verificada con expiración de ~6 h.
 - Módulo de TV conectado a iptv-org: `IptvOrgService` descarga `channels.json`, `streams.json`, `blocklist.json` y `logos.json` con timeout de 30 s, procesando un archivo cada vez y liberando cada array con `unset` antes de cargar el siguiente.
 - Filtros de TV: excluye canales cerrados (`closed`), canales del blocklist, streams con `referrer` o `user_agent`, y separa adultos. Prefiere HTTPS sin descartar HTTP y elige el mejor stream por calidad.
 - TV normalizada al contrato con `id`, `name`, `country`, `streamUrl`, `logo`, `category`, `source` (`iptv-org`) y `secure` (booleano según HTTPS).
@@ -135,20 +136,20 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Proyecto Laravel 13.39 limpio instalado en `api/` (PHP 8.4), en modo API: solo `routes/api.php`, sin rutas web, vistas ni assets de frontend.
 - `api/.env.example` configurado para MySQL (base `explorador_planet`). Sin migraciones ejecutadas ni tablas propias.
 - Servidor de desarrollo levantado con `php artisan serve`; `/up` responde 200.
-- Endpoints de ejemplo: `GET /api/countries/{code}/atlas`, `/radio` y `/tv`.
-- Un controlador por módulo (`AtlasController`, `RadioController`, `TvController`); TV y radio usan datos reales y atlas conserva mocks.
-- API Resources: `CountryResource`, `RadioStationResource`, `TvChannelResource`.
-- Services: `RadioBrowserService` e `IptvOrgService` implementados; `RestCountriesService` sigue vacío.
+- Endpoints de ejemplo: `GET /api/countries/{code}/radio` y `/tv`.
+- Un controlador por módulo (`RadioController`, `TvController`); TV y radio usan datos reales.
+- API Resources: `RadioStationResource` y `TvChannelResource`.
+- Services: `RadioBrowserService` e `IptvOrgService` implementados.
 - CORS habilitado en `config/cors.php` para `api/*`.
 - Validación de `{code}`: exactamente 2 letras; si no, `422` con mensaje claro en español.
-- Pruebas con curl de los tres endpoints (MX, códigos inválidos y atlas sin datos).
+- Pruebas con curl de los endpoints (MX y códigos inválidos).
 - Módulo de radio conectado a Radio Browser: `RadioBrowserService` consulta `/json/stations/bycountrycodeexact/{code}` con `hidebroken=true`, `order=votes`, `reverse=true` y `limit=50`.
 - `RadioBrowserService` usa un User-Agent propio, timeout de conexión y respuesta de 5 s, y rotación de servidores (descubrimiento por DNS de `all.api.radio-browser.info` y respaldo `de1`/`de2`, en orden aleatorio).
 - Normalización de emisoras: `stationuuid`→`id`, `name` con `trim`, `countrycode`→`country`, `url_resolved`→`streamUrl`, `favicon`→`logo` y `tags` separadas por coma, sin duplicados y con máximo de 5.
 - Caché de radio de 6 horas por país en el store `file`, con clave `radio-browser:stations:{CODE}`. También se cachea el resultado vacío para no repetir consultas.
 - `RadioController` ya no usa mocks: si todos los servidores fallan responde `502` con `message` y `error: radio_browser_unavailable`; si el país no tiene emisoras responde `200` con `data: []`.
-- Mocks de radio eliminados; los mocks de atlas siguen intactos.
-- Pruebas con curl del módulo de radio: PE y CO devuelven 50 emisoras; BV, TK y ZZ devuelven `200` con `data: []`; MEX y 1 devuelven `422`; fallo simulado de todos los servidores devuelve `502` y la recuperación posterior vuelve a `200`. Caché verificada con expiración de ~6 h y TV/atlas sin cambios.
+- Mocks de radio eliminados.
+- Pruebas con curl del módulo de radio: PE y CO devuelven 50 emisoras; BV, TK y ZZ devuelven `200` con `data: []`; MEX y 1 devuelven `422`; fallo simulado de todos los servidores devuelve `502` y la recuperación posterior vuelve a `200`. Caché verificada con expiración de ~6 h.
 - Módulo de TV conectado a iptv-org: `IptvOrgService` descarga `channels.json`, `streams.json`, `blocklist.json` y `logos.json` con timeout de 30 s, procesando un archivo cada vez y liberando cada array con `unset` antes de cargar el siguiente.
 - Filtros de TV: excluye canales cerrados (`closed`), canales del blocklist, streams con `referrer` o `user_agent`, y separa adultos. Prefiere HTTPS sin descartar HTTP y elige el mejor stream por calidad.
 - TV normalizada al contrato con `id`, `name`, `country`, `streamUrl`, `logo`, `category`, `source` (`iptv-org`) y `secure` (booleano según HTTPS).
@@ -217,7 +218,6 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 ## En curso
 
 - **Frontend**: construir el globo 3D y la interfaz en `front/`.
-- **Atlas con datos reales**: implementar `RestCountriesService` y sustituir los mocks.
 - **Comando de precalentamiento de caché de TV**: precalcular la caché por país; la primera consulta de cada país tarda unos 6 s.
 - **Antes de publicar**:
   - `APP_DEBUG=false`.
@@ -349,13 +349,9 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Caché y sesiones usan el driver `file`, y las colas `sync`. Las migraciones propias ya existen y se ejecutaron.
 - Se conservan las migraciones por defecto de Laravel (users, cache, jobs) y se añadieron las de Sanctum, rol, favoritos y bloqueos.
 - El health check nativo de Laravel en `/up` se usa para verificar que el servicio está vivo.
-- Los endpoints de módulos son `GET /api/countries/{code}/atlas`, `/radio` y `/tv`, con un controlador invocable por módulo.
+- Los endpoints de módulos son `GET /api/countries/{code}/radio` y `/tv`, con un controlador invocable por módulo.
 - El código de país se normaliza a mayúsculas y debe ser exactamente 2 letras ASCII; si no, la api responde `422` con `message` y `errors.code`.
-- Si el código es válido pero no hay datos de atlas, se responde `404` con un mensaje claro. TV y radio devuelven `{"data": []}`.
-- Las respuestas usan API Resources y van envueltas en `data` (objeto para atlas, lista para TV y radio).
-- El contrato de atlas incluye `code`, `name`, `officialName`, `capital`, `region`, `subregion`, `population`, `latlng`, `flag`, `languages` y `currencies`.
-- Los mocks de atlas existen solo para MX, ES y AR; sus URLs son ficticias. TV y radio ya usan datos reales.
-- `RestCountriesService` se mantiene vacío como punto de integración futura.
+- Las respuestas usan API Resources y van envueltas en `data` (lista para TV y radio).
 - CORS permite `GET`, `POST`, `DELETE` y `OPTIONS` desde cualquier origen para `api/*`.
 - Radio Browser es la fuente del módulo de radio. Se consulta el endpoint por código de país exacto y se piden solo emisoras no rotas, ordenadas por votos descendente y con un máximo de 50.
 - El servicio de radio se identifica con un User-Agent propio (`ExploradorPlanet/1.0`) y aplica un timeout de 5 s por intento de servidor.
@@ -416,13 +412,9 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - Caché y sesiones usan el driver `file`, y las colas `sync`. Las migraciones propias ya existen y se ejecutaron.
 - Se conservan las migraciones por defecto de Laravel (users, cache, jobs) y se añadieron las de Sanctum, rol, favoritos y bloqueos.
 - El health check nativo de Laravel en `/up` se usa para verificar que el servicio está vivo.
-- Los endpoints de módulos son `GET /api/countries/{code}/atlas`, `/radio` y `/tv`, con un controlador invocable por módulo.
+- Los endpoints de módulos son `GET /api/countries/{code}/radio` y `/tv`, con un controlador invocable por módulo.
 - El código de país se normaliza a mayúsculas y debe ser exactamente 2 letras ASCII; si no, la api responde `422` con `message` y `errors.code`.
-- Si el código es válido pero no hay datos de atlas, se responde `404` con un mensaje claro. TV y radio devuelven `{"data": []}`.
-- Las respuestas usan API Resources y van envueltas en `data` (objeto para atlas, lista para TV y radio).
-- El contrato de atlas incluye `code`, `name`, `officialName`, `capital`, `region`, `subregion`, `population`, `latlng`, `flag`, `languages` y `currencies`.
-- Los mocks de atlas existen solo para MX, ES y AR; sus URLs son ficticias. TV y radio ya usan datos reales.
-- `RestCountriesService` se mantiene vacío como punto de integración futura.
+- Las respuestas usan API Resources y van envueltas en `data` (lista para TV y radio).
 - CORS permite `GET`, `POST`, `DELETE` y `OPTIONS` desde cualquier origen para `api/*`.
 - Radio Browser es la fuente del módulo de radio. Se consulta el endpoint por código de país exacto y se piden solo emisoras no rotas, ordenadas por votos descendente y con un máximo de 50.
 - El servicio de radio se identifica con un User-Agent propio (`ExploradorPlanet/1.0`) y aplica un timeout de 5 s por intento de servidor.

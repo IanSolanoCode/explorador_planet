@@ -2,15 +2,13 @@
 
 ## Qué es
 
-API en Laravel del proyecto **Explorador Planet**, una web para descubrir el mundo mediante un globo 3D interactivo: el usuario hace clic en un país y ve TV en vivo, radio o datos de atlas.
+API en Laravel del proyecto **Explorador Planet**, una web para descubrir el mundo mediante un globo 3D interactivo: el usuario hace clic en un país y ve TV en vivo o radio.
 
 Esta API es la única puerta de entrada a las fuentes externas: consulta **Radio Browser** para la radio e **iptv-org** para la TV, normaliza el JSON, cachea los resultados y los expone al front con un contrato estable.
 
 También gestiona cuentas con tokens Bearer de Sanctum, favoritos por usuario y bloqueos globales de administración que se aplican a TV, radio y favoritos.
 
 El flujo es siempre el mismo: **fuentes externas → API → frontend**. El front nunca llama directamente a Radio Browser ni a iptv-org.
-
-El módulo de atlas todavía devuelve datos de ejemplo para MX, ES y AR; la integración con una fuente real de países sigue pendiente.
 
 ## Requisitos
 
@@ -149,18 +147,10 @@ Invoke-RestMethod "$BASE/api/countries/MX/tv" | Select-Object -ExpandProperty da
 
 **Esperado:** un objeto con `id`, `name`, `country`, `streamUrl`, `logo`, `category`, `source` y `secure`.
 
-### Atlas de México
-
-```powershell
-Invoke-RestMethod "$BASE/api/countries/MX/atlas"
-```
-
-**Esperado:** `data.code` igual a `MX`, con `name`, `officialName`, `capital`, `region`, `subregion`, `population`, `latlng`, `flag`, `languages` y `currencies`.
-
 ### Código de país inválido
 
 ```powershell
-curl.exe -s -w "`n%{http_code}" "$BASE/api/countries/MEX/atlas"
+curl.exe -s -w "`n%{http_code}" "$BASE/api/countries/MEX/radio"
 ```
 
 **Esperado:** `422` con `errors.code` y el mensaje `El código de país debe tener 2 letras.`
@@ -337,7 +327,6 @@ En desarrollo puedes correr `php artisan schedule:work` en una terminal aparte.
 | GET | `/api/admin/blocked` | Administrador | Lista todos los bloqueos. |
 | POST | `/api/admin/blocked` | Administrador | Crea un bloqueo global. |
 | DELETE | `/api/admin/blocked/{id}` | Administrador | Borra un bloqueo; `404` si no existe. |
-| GET | `/api/countries/{code}/atlas` | Público | Datos del país; hoy son datos de ejemplo. |
 | GET | `/api/countries/{code}/radio` | Público | Emisoras de radio del país. |
 | GET | `/api/countries/{code}/tv` | Público | Canales de TV no adultos. |
 | GET | `/api/countries/{code}/tv/adult` | Público | Canales de TV adultos, separados de `/tv`. |
@@ -381,26 +370,6 @@ Las respuestas usan API Resources y van envueltas en `data`.
       "tags": ["hits", "latin pop", "top 40"]
     }
   ]
-}
-```
-
-### Atlas
-
-```json
-{
-  "data": {
-    "code": "MX",
-    "name": "México",
-    "officialName": "Estados Unidos Mexicanos",
-    "capital": "Ciudad de México",
-    "region": "Américas",
-    "subregion": "América del Norte",
-    "population": 128932753,
-    "latlng": [23, -102],
-    "flag": "https://flagcdn.com/w320/mx.png",
-    "languages": ["Español"],
-    "currencies": ["MXN - Peso mexicano"]
-  }
 }
 ```
 
@@ -454,12 +423,10 @@ Las respuestas usan API Resources y van envueltas en `data`.
 - **Streams caídos después de la caché**: `DeadStreamFilter` consulta `stream_checks` una sola vez por petición y oculta un canal solo si existe una fila con `is_alive=false` para el par exacto `(item_id, streamUrl)`. Sin fila, el canal sigue visible.
 - **TV y TV adulta**: `/tv` devuelve solo canales no adultos y `/tv/adult` los adultos. Ambos comparten el mismo contrato. Hoy `/tv/adult` suele devolver una lista vacía porque iptv-org tiene muy pocos canales NSFW con stream.
 - **Cuentas**: Sanctum emite tokens Bearer que expiran a los 30 días. `logout` revoca solo el token usado en esa petición. Las contraseñas se guardan con bcrypt y nunca se devuelven.
-- **Atlas**: el controlador conserva datos de ejemplo para MX, ES y AR; `RestCountriesService` es el punto de integración futuro.
 
 ## Pendientes y antes de publicar
 
 - **Frontend**: construir el globo 3D y la interfaz en `front/`.
-- **Atlas real**: implementar `RestCountriesService` y sustituir los datos de ejemplo.
 - **Caché de TV**: crear un comando que precalcule la caché por país; la primera consulta de cada país tarda unos 6 segundos.
 - **Geobloqueo (decisión pendiente)**: el resultado de `streams:check` depende del país desde donde se ejecuta el servidor. Un stream con la etiqueta `Geo-blocked` puede responder desde una región y fallar desde otra. Antes de publicar hay que decidir si el servidor se ubica en una región representativa o si los streams `Geo-blocked` se tratan aparte. No se implementa ahora.
 - **Limpieza de `stream_checks` (pendiente)**: no hay un proceso que borre filas sin comprobar en más de 30 días; conviene añadirlo para que la tabla no crezca sin límite.

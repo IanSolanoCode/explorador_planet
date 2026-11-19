@@ -90,7 +90,7 @@ así las listas ya pintadas se actualizan al cambiar de sesión sin re-renderiza
 - **Códigos ISO-2**: Lógica en main.js usa `ISO_A2` → `WB_A2` → excepciones `{ "Norway": "NO" }`; territorios sin código quedan vacíos
 - **Panel lateral**: Al hacer clic en un país, muestra su nombre y código ISO-2
 - **Barra de pestañas**: "Radio" y "TV" - cambia el estado visual, funcionalidad pendiente
-- **API**: Consume endpoints `/api/countries/{code}/atlas`, `/radio`, `/tv` desde la API Laravel
+- **API**: Consume endpoints `/api/countries/{code}/radio` y `/api/countries/{code}/tv` desde la API Laravel
 
 ## Manejo de códigos ISO-2
 

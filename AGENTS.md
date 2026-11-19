@@ -6,7 +6,6 @@
 
 - **TV en vivo**
 - **Radio**
-- **Atlas**
 
 El repositorio tiene dos partes independientes:
 
@@ -22,7 +21,7 @@ Fuentes externas  →  api/ (Laravel)  →  front/ (globo 3D)
 Reglas del flujo:
 
 1. El front **nunca** llama directamente a fuentes externas.
-2. Toda integración externa (TV, radio, datos geográficos/atlas) se implementa en la api.
+2. Toda integración externa (TV y radio) se implementa en la api.
 3. La api normaliza las respuestas y las expone al front con un contrato estable.
 4. Si una fuente externa falla o cambia, el problema se resuelve en la api, no en el front.
 

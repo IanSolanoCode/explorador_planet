@@ -1,7 +1,6 @@
 <?php
 
 use App\Http\Controllers\AdminBlockedItemController;
-use App\Http\Controllers\AtlasController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\RadioController;
@@ -45,10 +44,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin')->group(function ()
 |--------------------------------------------------------------------------
 | Módulos públicos
 |--------------------------------------------------------------------------
-| Atlas, radio y TV no requieren autenticación en esta etapa.
+| Radio y TV no requieren autenticación en esta etapa.
 */
 
-Route::get('/countries/{code}/atlas', AtlasController::class);
 Route::get('/countries/{code}/radio', RadioController::class);
 Route::get('/countries/{code}/tv', TvController::class);
 Route::get('/countries/{code}/tv/adult', [TvController::class, 'adult']);

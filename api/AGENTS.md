@@ -5,7 +5,7 @@
 - **Laravel 13.39** sobre PHP 8.4, configurado **solo como API**: sin `routes/web.php`, sin vistas Blade ni assets de frontend.
 - Composer para dependencias. Sanctum `v4.3.3` instalado para tokens Bearer; sin Breeze ni Jetstream.
 - **MySQL** como base de datos. `.env.example` usa `explorador_planet` para desarrollo; la suite usa `explorador_planet_test` mediante `phpunit.xml`. Las credenciales viven en `.env` y no se versionan.
-- Acceso a fuentes externas (TV en vivo, radio, atlas) exclusivamente desde aquí; el front nunca las llama directamente.
+- Acceso a fuentes externas (TV en vivo y radio) exclusivamente desde aquí; el front nunca las llama directamente.
 
 ## Puesta en marcha
 
@@ -33,11 +33,11 @@ Desde `api/`:
 
 ## Estructura relevante
 
-- `routes/api.php` — auth (`POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`), favoritos (`GET/POST /api/favorites`, `DELETE /api/favorites/{id}`), administración de bloqueos (`GET/POST /api/admin/blocked`, `DELETE /api/admin/blocked/{id}`) y módulos (`GET /api/countries/{code}/atlas`, `/radio`, `/tv` y `/tv/adult`). El middleware `admin` está registrado en `bootstrap/app.php`; no hay rutas de prueba en este archivo.
-- `app/Http/Controllers/` — `AuthController`, `FavoriteController`, `AdminBlockedItemController` y un controlador invocable por módulo. `RadioController` usa Radio Browser, `TvController` usa iptv-org y atlas conserva datos mock (MX, ES, AR).
+- `routes/api.php` — auth (`POST /api/auth/register`, `POST /api/auth/login`, `POST /api/auth/logout`, `GET /api/auth/me`), favoritos (`GET/POST /api/favorites`, `DELETE /api/favorites/{id}`), administración de bloqueos (`GET/POST /api/admin/blocked`, `DELETE /api/admin/blocked/{id}`) y módulos (`GET /api/countries/{code}/radio`, `/tv` y `/tv/adult`). El middleware `admin` está registrado en `bootstrap/app.php`; no hay rutas de prueba en este archivo.
+- `app/Http/Controllers/` — `AuthController`, `FavoriteController`, `AdminBlockedItemController` y un controlador invocable por módulo. `RadioController` usa Radio Browser y `TvController` usa iptv-org.
 - `app/Http/Requests/` — `RegisterRequest`, `LoginRequest`, `StoreFavoriteRequest` y `StoreBlockedItemRequest`; validan y normalizan sus campos, y el registro rechaza `role`.
 - `app/Http/Resources/` — normalizan el JSON de cada módulo; `UserResource` expone solo `id`, `name`, `email` y `role`; `FavoriteResource` y `BlockedItemResource` usan camelCase.
-- `app/Services/` — `RadioBrowserService` e `IptvOrgService` implementados; `RestCountriesService` sigue como placeholder.
+- `app/Services/` — `RadioBrowserService` e `IptvOrgService` implementados.
 - `app/Support/BlockedItemFilter.php` — filtra TV y radio contra `blocked_items` después de leer la caché, con una sola consulta por petición.
 - `app/Console/Commands/AdminCreate.php` — comando `admin:create`; crea o actualiza el administrador desde `ADMIN_NAME`, `ADMIN_EMAIL` y `ADMIN_PASSWORD`, sin imprimir la contraseña.
 - `app/Http/Middleware/EnsureUserIsAdmin.php` — middleware `admin`; responde `403` JSON con `Solo administradores.` a usuarios autenticados sin rol admin.
