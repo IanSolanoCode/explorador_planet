@@ -61,7 +61,8 @@ front/
 │   ├── globo.js        # Globo, clic de país, cámara y controles
 │   ├── toolbar.js      # Pestañas Radio/TV
 │   ├── reproductor-radio.js
-│   └── reproductor-tv.js
+│   ├── reproductor-tv.js
+│   └── reproductor-ui.js # X (cerrar), minimizar y cierre por Escape compartidos
 ├── .env                # Variables de entorno (VITE_API_URL) - NUNCA versionar
 ├── .env.example        # Ejemplo de variables de entorno - SÍ versionar
 ├── .gitignore          # Ignora .env y node_modules front
@@ -101,6 +102,7 @@ así las listas ya pintadas se actualizan al cambiar de sesión sin re-renderiza
 - **Apilado**: la hoja sube por encima de la barra de radio con `:has()`; el respaldo sin `:has()` usa `--altura-reproductor` actualizado por JS.
 - **Pantalla completa**: `requestFullscreen`/`webkitRequestFullscreen`; en iPhone se usa `video.webkitEnterFullscreen()` solo para el video. Si no hay ninguna vía, se oculta el botón.
 - **Movimiento reducido**: `@media (prefers-reduced-motion: reduce)` desactiva las transiciones del panel y los reproductores.
+- **Reproductor en móvil**: botón **X** (`Cerrar reproductor`, 44 px) en la esquina; botón **Minimizar** (estado `minimizado` compartido entre radio y TV, conservado al cambiar de contenido y reseteado solo con la X). TV minimizada = miniatura 140×16:9 (el `<video>` no se destruye: solo CSS + clase); radio minimizada = barra delgada. La hoja reserva un margen inferior igual a la altura real del reproductor (`--altura-reproductor`) y a la barra superior (`--altura-barra`), medidas por un `ResizeObserver` en `hoja.js` que **nunca observa la hoja**. Escape cierra el reproductor expandido solo si el foco está dentro y no hay modal ni pantalla completa.
 
 ## Manejo de códigos ISO-2
 
