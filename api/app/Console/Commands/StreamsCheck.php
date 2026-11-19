@@ -70,6 +70,10 @@ class StreamsCheck extends Command
             (int) round($summary['peak_memory_bytes'] / 1048576),
         ));
 
+        if ($summary['truncated']) {
+            $this->warn('Se alcanzó el tope interno de 40 minutos; el resto se comprobará en la próxima ejecución.');
+        }
+
         if ($summary['discarded']) {
             $this->error('posible fallo de red o certificados: lote descartado, ejecución detenida.');
 

@@ -40,6 +40,12 @@ class StreamChecker
     private const BATCH_SIZE = 200;
 
     /**
+     * Tope interno de ejecución en segundos (40 min). No se usa ->timeout()
+     * porque el scheduler de esta versión de Laravel no lo expone.
+     */
+    private const MAX_RUN_SECONDS = 40 * 60;
+
+    /**
      * @param  string|null  $referenceUrl  URL de referencia del freno de red;
      *   inyectable en tests para evitar DNS real.
      */
@@ -61,9 +67,15 @@ class StreamChecker
     public function check(array $pairs, array $lookup, int $concurrency): array
     {
         $startedAt = microtime(true);
-        $summary = ['total' => 0, 'alive' => 0, 'dead' => 0, 'rejected' => 0, 'discarded' => false];
+        $summary = ['total' => 0, 'alive' => 0, 'dead' => 0, 'rejected' => 0, 'discarded' => false, 'truncated' => false];
 
         foreach (array_chunk($pairs, self::BATCH_SIZE) as $batch) {
+            if (microtime(true) - $startedAt > self::MAX_RUN_SECONDS) {
+                $summary['truncated'] = true;
+                Log::warning('streams:check alcanzó el tope interno de 40 minutos y se detiene.');
+                break;
+            }
+
             $result = $this->checkBatch($batch, $lookup, $concurrency);
 
             $summary['total'] += $result['total'];
