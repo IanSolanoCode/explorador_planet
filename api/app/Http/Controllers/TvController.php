@@ -6,6 +6,7 @@ use App\Exceptions\IptvOrgException;
 use App\Http\Resources\TvChannelResource;
 use App\Services\IptvOrgService;
 use App\Support\BlockedItemFilter;
+use App\Support\DeadStreamFilter;
 use Illuminate\Support\Facades\Log;
 
 class TvController extends Controller
@@ -13,6 +14,7 @@ class TvController extends Controller
     public function __construct(
         private readonly IptvOrgService $iptvOrg,
         private readonly BlockedItemFilter $blockedItemFilter,
+        private readonly DeadStreamFilter $deadStreamFilter,
     ) {}
 
     public function __invoke(string $code)
@@ -45,6 +47,9 @@ class TvController extends Controller
 
         // Se filtra después de la caché para que los bloqueos nuevos apliquen al instante.
         $channels = $this->blockedItemFilter->filter('tv', $channels);
+
+        // Los streams caídos se ocultan por par exacto (item_id, streamUrl).
+        $channels = $this->deadStreamFilter->filter($channels);
 
         return TvChannelResource::collection($channels);
     }
