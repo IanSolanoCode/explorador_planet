@@ -185,19 +185,22 @@ aside p {
 /* Mini reproductor fijo: visible mientras haya una emisora */
 .reproductor {
   position: fixed;
-  left: 20px;
-  bottom: 20px;
+  left: 0;
+  right: 0;
+  bottom: 0;
   z-index: 120;
   display: flex;
   align-items: center;
   gap: 12px;
-  width: min(420px, calc(100vw - 40px));
-  padding: 12px 14px;
-  background: rgba(10, 10, 15, 0.85);
+  width: 100%;
+  padding: 10px 12px;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  background: rgba(10, 10, 15, 0.9);
   border: 1px solid #3a3a5a;
-  border-radius: 10px;
+  border-bottom: 0;
+  border-radius: 0;
   backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
 }
 
 .reproductor[hidden] {
@@ -295,7 +298,7 @@ aside p {
   flex-direction: column;
   align-items: stretch;
   gap: 8px;
-  width: min(360px, 90vw);
+  width: 100%;
 }
 
 .tv-pantalla {
@@ -353,6 +356,7 @@ aside p {
 .reproductor:fullscreen {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   border-radius: 0;
   justify-content: center;
 }
@@ -1049,5 +1053,89 @@ body.es-admin .btn-bloquear {
   .emisoras {
     max-height: 200px;
     overflow-y: auto;
+  }
+
+  .reproductor {
+    left: 20px;
+    right: auto;
+    bottom: 20px;
+    width: min(420px, calc(100vw - 40px));
+    padding: 12px 14px;
+    border: 1px solid #3a3a5a;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  }
+
+  .reproductor--tv {
+    width: min(360px, 90vw);
+  }
+}
+
+/* --- Paisaje en teléfonos: el panel vuelve a ser columna lateral y la TV se
+   compacta para no comerse el globo (pantallas de ~360 px de alto). --- */
+@media (orientation: landscape) and (max-height: 500px) {
+  aside {
+    left: auto;
+    right: 0;
+    bottom: 0;
+    top: 0;
+    width: 320px;
+    max-height: none;
+    height: 100%;
+    border-bottom: 1px solid #3a3a5a;
+    border-radius: 0;
+    padding-top: calc(env(safe-area-inset-top, 0px) + 20px);
+  }
+
+  aside.hidden {
+    transform: translateX(105%);
+  }
+
+  aside.plegada {
+    height: 100%;
+    max-height: none;
+  }
+
+  .hoja-asa {
+    display: none;
+  }
+
+  .hoja-cerrar {
+    top: calc(env(safe-area-inset-top, 0px) + 8px);
+    right: 8px;
+  }
+
+  .reproductor--tv {
+    flex-direction: row;
+    align-items: center;
+    gap: 10px;
+    max-height: 45dvh;
+  }
+
+  .reproductor--tv .tv-pantalla {
+    flex: 0 0 auto;
+    width: auto;
+    height: min(38dvh, 170px);
+  }
+}
+
+/* --- Apilado hoja + barra de radio (solo móvil retrato) --- */
+:root {
+  --altura-reproductor: 0px;
+}
+
+@media (max-width: 767px) {
+  /* Caso moderno: :has() detecta la barra de radio visible y sube la hoja. */
+  @supports selector(:has(*)) {
+    body:has(#radio-player:not([hidden])) aside:not(.plegada) {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + 64px);
+    }
+  }
+
+  /* Caso sin :has(): JS mantiene --altura-reproductor al mostrar/ocultar radio. */
+  @supports not selector(:has(*)) {
+    aside:not(.plegada) {
+      bottom: calc(env(safe-area-inset-bottom, 0px) + var(--altura-reproductor, 0px));
+    }
   }
 }

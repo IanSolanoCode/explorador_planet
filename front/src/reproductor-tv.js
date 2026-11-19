@@ -71,19 +71,40 @@ function alternarSilencioTv() {
 function alternarPantallaCompleta() {
   if (!reproductorTvEls) return;
   const contenedor = reproductorTvEls.contenedor;
+  const video = videoActual;
 
-  // Se alterna sobre el contenedor para que los controles sigan visibles.
+  // Ya en pantalla completa del contenedor: salir.
   if (document.fullscreenElement === contenedor) {
-    if (typeof document.exitFullscreen === 'function') {
-      document.exitFullscreen();
-    }
+    if (typeof document.exitFullscreen === 'function') document.exitFullscreen();
     return;
   }
 
-  if (typeof contenedor.requestFullscreen !== 'function') return;
-  contenedor.requestFullscreen().catch(() => {
-    // Si el navegador rechaza la petición, no se cambia el estado.
-  });
+  // Pantalla completa del contenedor (incluye los controles propios).
+  if (typeof contenedor.requestFullscreen === 'function') {
+    contenedor.requestFullscreen().catch(() => {});
+    return;
+  }
+  if (typeof contenedor.webkitRequestFullscreen === 'function') {
+    contenedor.webkitRequestFullscreen();
+    return;
+  }
+
+  // iPhone: pantalla completa solo del <video> (sin controles propios).
+  if (video && typeof video.webkitEnterFullscreen === 'function') {
+    video.webkitEnterFullscreen();
+  }
+}
+
+// Indica si existe alguna vía de pantalla completa (estándar, prefijada o la
+// del <video> de iOS). Si no, el botón se oculta para no ofrecer algo roto.
+function soportaPantallaCompleta() {
+  const raiz = document.documentElement;
+  const videoPrueba = document.createElement('video');
+  return (
+    typeof raiz.requestFullscreen === 'function' ||
+    typeof raiz.webkitRequestFullscreen === 'function' ||
+    typeof videoPrueba.webkitEnterFullscreen === 'function'
+  );
 }
 
 // Carga hls.js bajo demanda: no pesa en la carga inicial de la página.
@@ -157,6 +178,8 @@ function crearReproductorTv() {
   btnPantalla.setAttribute('aria-label', 'Pantalla completa');
   btnPantalla.textContent = '⛶';
   btnPantalla.addEventListener('click', alternarPantallaCompleta);
+  // Sin ninguna vía de pantalla completa (algunos navegadores), no se ofrece.
+  if (!soportaPantallaCompleta()) btnPantalla.hidden = true;
 
   const btnDetener = document.createElement('button');
   btnDetener.type = 'button';

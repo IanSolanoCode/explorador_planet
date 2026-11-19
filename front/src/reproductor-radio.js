@@ -186,6 +186,8 @@ function reproducirEmisora(streamUrl, nombre, logo) {
   emisoraActual = { nombre, url: streamUrl, logo: logo || '' };
 
   reproductorEls.contenedor.hidden = false;
+  // Respaldo sin :has(): la hoja sube por encima de la barra de radio.
+  document.documentElement.style.setProperty('--altura-reproductor', '64px');
   reproductorEls.nombre.textContent = nombre;
   actualizarLogoReproductor(logo);
   setEstadoReproductor('conectando');
@@ -273,6 +275,7 @@ function detenerAudio() {
   if (reproductorEls) {
     reproductorEls.contenedor.hidden = true;
     setEstadoReproductor('inactivo');
+    document.documentElement.style.setProperty('--altura-reproductor', '0px');
   }
 }
 
