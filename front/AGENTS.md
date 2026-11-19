@@ -51,6 +51,7 @@ front/
 │   ├── radio.js        # Carga de emisoras con AbortController
 │   ├── tv.js           # Carga de canales con AbortController
 │   ├── panel.js        # Panel lateral de radio y TV
+│   ├── hoja.js         # Hoja inferior (móvil) / visibilidad y controles del panel
 │   ├── favoritos.js    # Corazones, lista y peticiones de favoritos
 │   ├── auth.js         # Token, cierre de sesión y /auth/me
 │   ├── modal-auth.js   # Modal de login y registro
@@ -91,6 +92,15 @@ así las listas ya pintadas se actualizan al cambiar de sesión sin re-renderiza
 - **Panel lateral**: Al hacer clic en un país, muestra su nombre y código ISO-2
 - **Barra de pestañas**: "Radio" y "TV" - cambia el estado visual, funcionalidad pendiente
 - **API**: Consume endpoints `/api/countries/{code}/radio` y `/api/countries/{code}/tv` desde la API Laravel
+
+## Diseño responsivo
+
+- **Mobile-first**: la base de `main.css` es para pantallas angostas; `@media (min-width: 768px)` restaura tablet/escritorio. `100vh` convive con `100dvh` (respaldo) y se respetan los `env(safe-area-inset-*)`.
+- **Hoja inferior**: por debajo de 768 px, el `aside#sidebar` es una bottom sheet (`max-height: 55dvh`, scroll interno) con asa (plegar/expandir) y botón de cerrar; se abre con cualquier contenido (país, "Mis favoritos" o "Bloqueos") y se pliega sin destruir el contenido. En escritorio vuelve a ser columna derecha.
+- **Paisaje corto**: `@media (orientation: landscape) and (max-height: 500px)` convierte el panel en columna lateral (~320 px) y limita la TV a ~45dvh.
+- **Apilado**: la hoja sube por encima de la barra de radio con `:has()`; el respaldo sin `:has()` usa `--altura-reproductor` actualizado por JS.
+- **Pantalla completa**: `requestFullscreen`/`webkitRequestFullscreen`; en iPhone se usa `video.webkitEnterFullscreen()` solo para el video. Si no hay ninguna vía, se oculta el botón.
+- **Movimiento reducido**: `@media (prefers-reduced-motion: reduce)` desactiva las transiciones del panel y los reproductores.
 
 ## Manejo de códigos ISO-2
 
