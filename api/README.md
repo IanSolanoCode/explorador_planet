@@ -279,9 +279,49 @@ curl.exe -s -o NUL -w "%{http_code}" -X DELETE -H "Authorization: Bearer $ADMIN_
 php artisan test
 ```
 
-**Esperado:** la suite completa en verde. En el momento de escribir esta documentación son **34 tests y 140 aserciones**.
+**Esperado:** la suite completa en verde. En el momento de escribir esta documentación son **83 tests y 293 aserciones**.
 
 Los tests usan la base **`explorador_planet_test`**, fijada en `phpunit.xml`, y nunca la base de desarrollo. Por eso debes crearla y migrarla antes de ejecutar la suite.
+
+## Comprobación de streams de TV
+
+La API comprueba periódicamente si los `streamUrl` de TV responden y oculta los que llevan tres fallos consecutivos. El resultado se guarda en la tabla `stream_checks`.
+
+### Comando
+
+```powershell
+php artisan streams:check --country=MX --limit=200 --concurrency=10
+```
+
+| Opción | Por defecto | Para qué sirve |
+|---|---|---|
+| `--limit` | `800` | Máximo de streams a comprobar. |
+| `--country` | (todos) | Limita a un código de país (por ejemplo `MX`). |
+| `--concurrency` | `10` | Peticiones simultáneas. |
+
+- Se comprueban primero los streams nunca comprobados y luego los más antiguos.
+- Cada URL se pide con timeout de 8 s, User-Agent propio, como máximo 3 redirecciones y leyendo solo los primeros 4 KB.
+- Un stream está **vivo** si responde `200` y el cuerpo empieza por `#EXTM3U`.
+- Un fallo aislado no oculta el canal: `is_alive` pasa a `false` al tercer fallo consecutivo y cualquier éxito reinicia el contador.
+- La columna `error` guarda solo códigos cortos: `timeout`, `dns`, `tls`, `http_<status>`, `no_hls`, `direccion_no_permitida`, `redireccion`, `red`.
+- Si más del 90 % de un lote falla (mínimo 20), el comando consulta `https://iptv-org.github.io/api/countries.json` como referencia. Si esa referencia tampoco responde, descarta el lote sin escribir y avisa `posible fallo de red o certificados`.
+- Tope interno de 40 minutos por ejecución.
+
+### Programación
+
+El comando está programado cada hora sin solapamiento en `routes/console.php`:
+
+```php
+Schedule::command('streams:check --limit=800')->hourly()->withoutOverlapping(50);
+```
+
+Para que se ejecute, el servidor debe lanzar el scheduler de Laravel una vez por minuto:
+
+```cron
+* * * * * cd /ruta/a/explorador_planet/api && php artisan schedule:run >> /dev/null 2>&1
+```
+
+En desarrollo puedes correr `php artisan schedule:work` en una terminal aparte.
 
 ## Referencia de endpoints
 
@@ -411,6 +451,7 @@ Las respuestas usan API Resources y van envueltas en `data`.
 
 - **Caché de 6 horas**: TV y radio guardan el resultado normalizado por país en el store `file`. TV usa las claves `iptv:tv:{CODE}` e `iptv:tv:adult:{CODE}`; radio usa `radio-browser:stations:{CODE}`. Los fallos de las fuentes no se cachean.
 - **Bloqueos después de la caché**: `BlockedItemFilter` consulta `blocked_items` una sola vez por petición y elimina los ids bloqueados de la lista ya cacheada. Así un bloqueo nuevo surte efecto de inmediato, sin esperar a que caduque la caché.
+- **Streams caídos después de la caché**: `DeadStreamFilter` consulta `stream_checks` una sola vez por petición y oculta un canal solo si existe una fila con `is_alive=false` para el par exacto `(item_id, streamUrl)`. Sin fila, el canal sigue visible.
 - **TV y TV adulta**: `/tv` devuelve solo canales no adultos y `/tv/adult` los adultos. Ambos comparten el mismo contrato. Hoy `/tv/adult` suele devolver una lista vacía porque iptv-org tiene muy pocos canales NSFW con stream.
 - **Cuentas**: Sanctum emite tokens Bearer que expiran a los 30 días. `logout` revoca solo el token usado en esa petición. Las contraseñas se guardan con bcrypt y nunca se devuelven.
 - **Atlas**: el controlador conserva datos de ejemplo para MX, ES y AR; `RestCountriesService` es el punto de integración futuro.
@@ -419,8 +460,9 @@ Las respuestas usan API Resources y van envueltas en `data`.
 
 - **Frontend**: construir el globo 3D y la interfaz en `front/`.
 - **Atlas real**: implementar `RestCountriesService` y sustituir los datos de ejemplo.
-- **Streams caídos**: verificar los `streamUrl` de TV y radio y descartar los que no respondan.
 - **Caché de TV**: crear un comando que precalcule la caché por país; la primera consulta de cada país tarda unos 6 segundos.
+- **Geobloqueo (decisión pendiente)**: el resultado de `streams:check` depende del país desde donde se ejecuta el servidor. Un stream con la etiqueta `Geo-blocked` puede responder desde una región y fallar desde otra. Antes de publicar hay que decidir si el servidor se ubica en una región representativa o si los streams `Geo-blocked` se tratan aparte. No se implementa ahora.
+- **Limpieza de `stream_checks` (pendiente)**: no hay un proceso que borre filas sin comprobar en más de 30 días; conviene añadirlo para que la tabla no crezca sin límite.
 
 Antes de publicar:
 

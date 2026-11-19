@@ -2,10 +2,20 @@
 
 Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
-Última actualización: 2026-11-17
+Última actualización: 2026-11-18
 
 ## Hecho
 
+- **Verificación de streams caídos (TV) — hecho (2026-11-18)**:
+  - Migración `stream_checks` y modelo `StreamCheck`: `item_id`, `stream_url` (único par), `is_alive`, `consecutive_failures`, `http_status`, `error`, `checked_at`, `last_ok_at`; índice en `checked_at`. Migrada en desarrollo y en `explorador_planet_test`.
+  - `IptvOrgService::allStreamPairs()`: pares `(item_id, streamUrl, country)` de todos los países con una sola descarga y caché propia de 6 h (`iptv:tv:pairs`). Reutiliza los mismos filtros que `channelsByCountry`. Pico medido: 9 807 pares, 102 MiB con `memory_limit=128M` (sin necesidad de trocear).
+  - `StreamUrlGuard`: solo `http/https`; rechaza `localhost`/`*.localhost`, IPs numéricas y hexadecimales, privadas/reservadas (127/8, 10/8, 172.16/12, 192.168/16, 169.254/16, 0/8, 100.64/10, reservadas, multicast), `::`, `::1`, `fc00::/7`, `fe80::/10`, `2001:db8::/32`, `ff00::/8`, IPv4-mapeada y NAT64, y URLs con `user:pass@`. Resuelve el hostname (A + AAAA) y devuelve la IP para fijarla con `CURLOPT_RESOLVE` (anti DNS-rebinding).
+  - `StreamChecker`: lotes con `Http::pool` (concurrencia 10 por defecto), timeout 8 s, UA propio, máx. 3 redirecciones manuales (cada `Location` validada), lectura de solo 4 KB (corte con `progress`), vivo = 200 + cuerpo `#EXTM3U` (ignorando BOM/espacios). Errores con códigos cortos. Freno de red: lote ≥20 con >90 % de fallos → una petición de referencia; si no responde, descarta el lote y avisa `posible fallo de red o certificados`. Tope interno de 40 min.
+  - Comando `streams:check {--limit=800} {--country=} {--concurrency=10}`: nunca comprobados primero, luego más antiguos, mezclando países en bloques de ~100; un upsert por lote.
+  - `DeadStreamFilter`: oculta un canal solo si hay fila con `is_alive=false` para el par exacto `(item_id, streamUrl)`; una consulta por petición. Aplicado en `TvController` para `/tv` y `/tv/adult` después de `BlockedItemFilter`.
+  - Scheduler en `routes/console.php`: `Schedule::command('streams:check --limit=800')->hourly()->withoutOverlapping(50)`.
+  - Suite: 83 tests y 293 aserciones en verde (siempre contra `explorador_planet_test`).
+  - **`->timeout()` NO existe** en los eventos del scheduler de Laravel 13.39 (verificado en `vendor/.../Console/Scheduling`); se confía en el tope interno de 40 min y en el mutex de `withoutOverlapping(50)`.
 - **Radio — hecho**: endpoints, integración con Radio Browser, caché de 6 h y filtro de bloqueos.
 - **TV — hecho**: endpoints regular y adulto, integración con iptv-org, caché de 6 h y filtro de bloqueos.
 - **Usuarios — hecho**: registro, login, logout, `/me`, Sanctum, expiración de tokens y rate limits.
@@ -208,7 +218,6 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 
 - **Frontend**: construir el globo 3D y la interfaz en `front/`.
 - **Atlas con datos reales**: implementar `RestCountriesService` y sustituir los mocks.
-- **Verificación de streams caídos**: comprobar los `streamUrl` de TV y radio y descartar los que no respondan.
 - **Comando de precalentamiento de caché de TV**: precalcular la caché por país; la primera consulta de cada país tarda unos 6 s.
 - **Antes de publicar**:
   - `APP_DEBUG=false`.
@@ -362,6 +371,8 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - La caché de TV es de 6 h por país, separada para adultos y no adultos, y se construye una sola vez por TTL; los fallos de descarga no se cachean.
 - Si iptv-org falla, la api responde `502` con `iptv_org_unavailable`; un país sin canales responde `200` con `data: []`.
 - El endpoint `/tv/adult` existe y está separado de `/tv`, pero **casi siempre devolverá `data: []`**: solo hay 2 canales NSFW con stream en todo el dataset de iptv-org y ninguno está en MX, ES o CO.
+- **Verificación de streams**: el comando `streams:check` no usa `->timeout()` porque los eventos del scheduler de Laravel 13.39 no exponen ese método; se apoya en un tope interno de 40 minutos y en el mutex de `withoutOverlapping(50)`.
+- **Geobloqueo (decisión pendiente)**: el resultado de `streams:check` depende del país desde donde se ejecuta el servidor. Un stream etiquetado `Geo-blocked` puede responder desde una región y fallar desde otra. Antes de publicar hay que decidir si el servidor se ubica en una región representativa o si esos streams se tratan aparte. No se implementa ahora.
 - La autenticación usará Sanctum con tokens Bearer; no habrá autenticación por cookies ni CSRF de SPA.
 - Los tokens de Sanctum expiran a los 30 días. La configuración central es `sanctum.expiration = 43200`; además, cada token creado en la etapa 3 recibe `expires_at` explícito de 30 días.
 - Las rutas `POST /auth/register` y `POST /auth/login` son públicas; `POST /auth/logout` y `GET /auth/me` usan `auth:sanctum`.
@@ -427,6 +438,8 @@ Estado del proyecto **Explorador Planet**. Actualizar al terminar cada tarea.
 - La caché de TV es de 6 h por país, separada para adultos y no adultos, y se construye una sola vez por TTL; los fallos de descarga no se cachean.
 - Si iptv-org falla, la api responde `502` con `iptv_org_unavailable`; un país sin canales responde `200` con `data: []`.
 - El endpoint `/tv/adult` existe y está separado de `/tv`, pero **casi siempre devolverá `data: []`**: solo hay 2 canales NSFW con stream en todo el dataset de iptv-org y ninguno está en MX, ES o CO.
+- **Verificación de streams**: el comando `streams:check` no usa `->timeout()` porque los eventos del scheduler de Laravel 13.39 no exponen ese método; se apoya en un tope interno de 40 minutos y en el mutex de `withoutOverlapping(50)`.
+- **Geobloqueo (decisión pendiente)**: el resultado de `streams:check` depende del país desde donde se ejecuta el servidor. Un stream etiquetado `Geo-blocked` puede responder desde una región y fallar desde otra. Antes de publicar hay que decidir si el servidor se ubica en una región representativa o si esos streams se tratan aparte. No se implementa ahora.
 - La autenticación usará Sanctum con tokens Bearer; no habrá autenticación por cookies ni CSRF de SPA.
 - Los tokens de Sanctum expiran a los 30 días. La configuración central es `sanctum.expiration = 43200`; además, cada token creado en la etapa 3 recibe `expires_at` explícito de 30 días.
 - Las rutas `POST /auth/register` y `POST /auth/login` son públicas; `POST /auth/logout` y `GET /auth/me` usan `auth:sanctum`.
