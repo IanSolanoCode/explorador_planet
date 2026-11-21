@@ -71,7 +71,7 @@ function iniciarMedicionAltura() {
 
   const radio = document.getElementById('radio-player');
   const tv = document.getElementById('tv-player');
-  const barra = document.getElementById('toolbar');
+  const barra = document.getElementById('barra-superior');
   const aside = document.getElementById('sidebar');
 
   let frame = 0;

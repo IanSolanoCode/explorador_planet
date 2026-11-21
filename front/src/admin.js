@@ -31,56 +31,23 @@ function claveFavorito(tipo, itemId) {
 }
 
 // ---------------------------------------------------------------------------
-// Botón "Admin" y visibilidad por sesión
+// Item "Bloqueos" del menú de cuenta (solo visible para administradores)
 // ---------------------------------------------------------------------------
 
-function crearBotonAdmin() {
-  if (document.getElementById('btn-admin')) return;
-  const toolbar = document.getElementById('toolbar');
-  if (!toolbar) return;
-
-  const boton = document.createElement('button');
-  boton.id = 'btn-admin';
-  boton.type = 'button';
-  boton.className = 'tab-btn accion-btn btn-admin';
-  boton.textContent = 'Admin';
-  boton.setAttribute('aria-pressed', 'false');
-  boton.addEventListener('click', () => {
-    if (!esAdmin()) return;
-    mostrarBloqueos();
-  });
-
-  // Se inserta antes del menú de cuenta para no alterar los ids existentes.
-  const cuenta = document.getElementById('cuenta');
-  if (cuenta && cuenta.parentNode === toolbar) {
-    toolbar.insertBefore(boton, cuenta);
-  } else {
-    toolbar.appendChild(boton);
-  }
-}
-
 function desactivarBotonAdmin() {
-  const boton = document.getElementById('btn-admin');
-  if (!boton) return;
-  boton.classList.remove('activo');
-  boton.setAttribute('aria-pressed', 'false');
+  const item = document.getElementById('btn-bloqueos');
+  if (!item) return;
+  item.classList.remove('activo');
 }
 
 // Se ejecuta en cada cambio de sesión: ajusta la clase global y limpia el
-// estado de administración cuando el usuario deja de ser administrador.
+// estado de administración cuando el usuario deja de ser administrador. El
+// item "Bloqueos" vive en el menú de la cuenta y lo muestra/oculta cuenta.js.
 function manejarCambioSesionAdmin() {
   const admin = esAdmin();
   document.body.classList.toggle('es-admin', admin);
 
-  if (admin) {
-    // El botón solo existe mientras haya un administrador autenticado.
-    crearBotonAdmin();
-    return;
-  }
-
-  // Retirar el botón Admin al cerrar sesión o cambiar de usuario.
-  const boton = document.getElementById('btn-admin');
-  if (boton) boton.remove();
+  if (admin) return;
 
   // Cerrar el formulario sin devolver el foco: la tarjeta que lo abrió puede
   // estar a punto de desaparecer al cerrar sesión.
@@ -418,12 +385,20 @@ async function enviarBloqueo(evento) {
 
 function setupAdmin() {
   // La clase del <body> se actualiza en cada cambio de sesión; las tarjetas
-  // ya dibujadas muestran u ocultan su botón sin re-renderizarse y el botón
-  // Admin se crea o se retira según el rol.
+  // ya dibujadas muestran u ocultan su botón sin re-renderizarse.
   alCambiarSesion(manejarCambioSesionAdmin);
   manejarCambioSesionAdmin();
 
-  // Al cambiar de vista, el botón "Admin" deja de estar activo.
+  // El item "Bloqueos" del menú de cuenta abre el panel de bloqueos.
+  const itemBloqueos = document.getElementById('btn-bloqueos');
+  if (itemBloqueos) {
+    itemBloqueos.addEventListener('click', () => {
+      if (!esAdmin()) return;
+      mostrarBloqueos();
+    });
+  }
+
+  // Al cambiar de vista, el item "Bloqueos" deja de estar activo.
   const botonFavoritos = document.getElementById('btn-favoritos');
   if (botonFavoritos) botonFavoritos.addEventListener('click', desactivarBotonAdmin);
   document.querySelectorAll('.tab-btn[data-tab]').forEach((btn) => {

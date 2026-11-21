@@ -19,27 +19,37 @@
 </head>
 <body>
   <div id="globe"></div>
+  <header id="barra-superior">
+    <div id="controles-izquierda">
+      <button id="btn-tema" class="btn-icono" type="button" aria-label="Cambiar a modo claro">
+        <svg class="icono-tema icono-sol" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5" fill="currentColor"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
+        <svg class="icono-tema icono-luna" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" fill="currentColor"/></svg>
+      </button>
+      <button id="btn-favoritos" class="btn-icono accion-btn" type="button" aria-pressed="false" aria-label="Mis favoritos">
+        <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="currentColor"/></svg>
+      </button>
+      <div id="cuenta" class="cuenta">
+        <button id="btn-cuenta" class="btn-cuenta" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="Entrar">
+          <svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="8" r="4" fill="currentColor"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6v1H4z" fill="currentColor"/></svg>
+          <span id="cuenta-nombre" class="cuenta-nombre">Entrar</span>
+        </button>
+        <div id="menu-cuenta" class="cuenta-menu" role="menu" hidden>
+          <button id="btn-bloqueos" class="cuenta-item" type="button" role="menuitem" hidden>Bloqueos</button>
+          <button id="btn-salir" class="cuenta-item" type="button" role="menuitem">Salir</button>
+        </div>
+      </div>
+    </div>
+    <nav id="toolbar" class="segmentado" aria-label="Módulo">
+      <button class="tab-btn active" data-tab="radio">Radio</button>
+      <button class="tab-btn" data-tab="tv">TV</button>
+    </nav>
+  </header>
   <aside id="sidebar">
     <div id="country-info" class="hidden">
       <h3 id="country-name"></h3>
       <p id="country-code"></p>
     </div>
   </aside>
-  <nav id="toolbar">
-    <button class="tab-btn active" data-tab="radio">Radio</button>
-    <button class="tab-btn" data-tab="tv">TV</button>
-    <button id="btn-tema" class="btn-icono" type="button" aria-label="Cambiar a modo claro">
-      <svg class="icono-tema icono-sol" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="5" fill="currentColor"/><path d="M12 1v3M12 20v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M1 12h3M20 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round" fill="none"/></svg>
-      <svg class="icono-tema icono-luna" viewBox="0 0 24 24" width="24" height="24" aria-hidden="true" focusable="false"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z" fill="currentColor"/></svg>
-    </button>
-    <button id="btn-favoritos" class="tab-btn accion-btn" type="button" aria-pressed="false">Mis favoritos</button>
-    <div id="cuenta" class="cuenta">
-      <button id="btn-cuenta" class="tab-btn cuenta-btn" type="button" aria-haspopup="menu" aria-expanded="false">Entrar</button>
-      <div id="menu-cuenta" class="cuenta-menu" role="menu" hidden>
-        <button id="btn-salir" class="cuenta-salir" type="button" role="menuitem">Salir</button>
-      </div>
-    </div>
-  </nav>
   <script type="module" src="/main.js"></script>
 </body>
 </html>

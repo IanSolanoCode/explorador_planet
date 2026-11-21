@@ -441,44 +441,59 @@ aside p {
   aspect-ratio: auto;
 }
 
-nav {
+#barra-superior {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
-  transform: none;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
   z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--esp-2);
   padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px;
 }
 
-.tab-btn {
-  padding: 8px 16px;
-  min-height: 44px;
-  min-width: 44px;
+#controles-izquierda {
+  display: flex;
+  align-items: center;
+  gap: var(--esp-2);
+}
+
+nav.segmentado {
+  align-self: center;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  padding: 3px;
+}
+
+.segmentado .tab-btn {
+  padding: 6px 18px;
+  min-height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: rgba(50, 50, 80, 0.5);
-  border: 1px solid #4a4a7a;
-  border-radius: 4px;
-  color: #e0e0e0;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radio-pildora);
+  color: var(--texto-2);
   cursor: pointer;
-  font-size: 0.875rem;
-  transition: all 0.2s ease;
+  font-size: var(--fs-14);
+  font-weight: var(--fw-600);
+  transition: background 0.2s ease, color 0.2s ease;
 }
 
-.tab-btn.active {
-  background: #3a3a5a;
-  border-color: #5a5a8a;
+.segmentado .tab-btn.active {
+  background: var(--acento);
+  color: var(--acento-texto);
 }
 
-.tab-btn:hover:not(.active) {
-  background: rgba(70, 70, 100, 0.7);
+.segmentado .tab-btn:hover:not(.active) {
+  background: rgba(127, 127, 127, 0.14);
 }
 
 /* Botón de icono (tema, favoritos y cuenta): 44 px con SVG en línea. */
@@ -507,17 +522,11 @@ nav {
 
 /* --- Cuenta, favoritos y modal (elementos nuevos) --- */
 
-/* La barra puede crecer con cuenta y favoritos; en pantallas angostas envuelve. */
-#toolbar {
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: calc(100vw - 24px);
-}
-
 .accion-btn.activo,
 .accion-btn[aria-pressed="true"] {
-  border-color: #ffd700;
-  color: #ffd700;
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--acento-texto);
 }
 
 .cuenta {
@@ -526,8 +535,27 @@ nav {
   align-items: center;
 }
 
-.cuenta-btn {
-  max-width: 160px;
+.btn-cuenta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--esp-2);
+  height: 44px;
+  padding: 0 12px;
+  background: transparent;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-s);
+  color: var(--texto);
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-14);
+}
+
+.btn-cuenta:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cuenta-nombre {
+  max-width: 140px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -537,11 +565,11 @@ nav {
   position: absolute;
   top: calc(100% + 6px);
   right: 0;
-  min-width: 120px;
+  min-width: 160px;
   padding: 6px;
-  background: rgba(16, 16, 28, 0.97);
-  border: 1px solid #3a3a5a;
-  border-radius: 8px;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-m);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   z-index: 150;
 }
@@ -550,26 +578,31 @@ nav {
   display: none;
 }
 
-.cuenta-salir {
+.cuenta-item {
   width: 100%;
-  padding: 8px 10px;
+  padding: 10px 12px;
   background: transparent;
   border: 0;
-  border-radius: 6px;
-  color: #e0e0e0;
+  border-radius: var(--radio-s);
+  color: var(--texto);
   font: inherit;
-  font-size: 0.85rem;
+  font-size: var(--fs-14);
   text-align: left;
   cursor: pointer;
 }
 
-.cuenta-salir:hover {
+.cuenta-item:hover {
   background: rgba(255, 255, 255, 0.08);
 }
 
-.cuenta-salir:disabled {
+.cuenta-item:disabled {
   opacity: 0.6;
   cursor: wait;
+}
+
+.cuenta-item.activo {
+  background: var(--acento);
+  color: var(--acento-texto);
 }
 
 /* Corazón dentro de cada tarjeta de radio o TV. */
@@ -619,12 +652,12 @@ nav {
 }
 
 .btn-favorito:focus-visible,
-.cuenta-btn:focus-visible,
-.cuenta-salir:focus-visible,
+.btn-cuenta:focus-visible,
+.cuenta-item:focus-visible,
 .auth-tab:focus-visible,
 .auth-submit:focus-visible,
 .modal-auth__cerrar:focus-visible {
-  outline: 2px solid #ffd700;
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
@@ -834,15 +867,12 @@ nav {
 
 /* --- Administrador: botón, bloqueo y panel de bloqueos --- */
 
-/* El botón Admin y los botones Bloquear solo se ven con sesión de admin.
-   La clase vive en <body> para que las tarjetas ya dibujadas se actualicen
-   solas sin reconstruir la lista. */
-.btn-admin,
+/* El botón Bloquear de cada tarjeta solo se ve con sesión de admin. La clase
+   vive en <body> para que las tarjetas ya dibujadas se actualicen solas. */
 .btn-bloquear {
   display: none;
 }
 
-body.es-admin .btn-admin,
 body.es-admin .btn-bloquear {
   display: inline-flex;
 }
@@ -1091,13 +1121,8 @@ body.es-admin .btn-bloquear {
 }
 
 @media (max-width: 640px) {
-  #toolbar {
-    gap: 6px;
-    max-width: calc(100vw - 24px);
-  }
-
-  .cuenta-btn {
-    max-width: 110px;
+  .cuenta-nombre {
+    max-width: 96px;
   }
 
   .modal-auth__dialog {
@@ -1109,18 +1134,21 @@ body.es-admin .btn-bloquear {
    Base = pantallas angostas; @media (min-width) restaura tablet/escritorio. */
 
 @media (min-width: 768px) {
-  nav {
-    top: 20px;
-    left: 50%;
-    right: auto;
-    transform: translateX(-50%);
-    padding: 0;
-    gap: 12px;
-    margin-top: 8px;
+  #barra-superior {
+    flex-direction: row;
+    align-items: center;
+    justify-content: center;
   }
 
-  #toolbar {
-    max-width: calc(100vw - 40px);
+  #controles-izquierda {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+  }
+
+  nav.segmentado {
+    align-self: auto;
   }
 
   aside {

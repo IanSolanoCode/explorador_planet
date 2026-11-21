@@ -148,10 +148,9 @@ function mostrarBloqueos() {
   // El panel de bloqueos ocupa el mismo hueco que "Mis favoritos".
   marcarVistaFavoritos(false);
 
-  const boton = document.getElementById('btn-admin');
+  const boton = document.getElementById('btn-bloqueos');
   if (boton) {
     boton.classList.add('activo');
-    boton.setAttribute('aria-pressed', 'true');
   }
 
   renderBloqueosPanel({ cargando: true });
