@@ -4,10 +4,83 @@
   box-sizing: border-box;
 }
 
+/* --- Sistema de diseño (tokens) --- */
+:root {
+  /* escala: radios, espaciado, tipografía y pesos */
+  --radio-s: 12px;
+  --radio-m: 16px;
+  --radio-l: 24px;
+  --radio-pildora: 999px;
+  --esp-1: 4px;
+  --esp-2: 8px;
+  --esp-3: 12px;
+  --esp-4: 16px;
+  --esp-5: 24px;
+  --esp-6: 32px;
+  --fs-12: 12px;
+  --fs-14: 14px;
+  --fs-16: 16px;
+  --fs-20: 20px;
+  --fs-28: 28px;
+  --fw-400: 400;
+  --fw-500: 500;
+  --fw-600: 600;
+  --fw-700: 700;
+
+  /* acento: solo como relleno con texto oscuro */
+  --acento: #ffd700;
+  --acento-texto: #111111;
+
+  /* tema oscuro (por defecto) */
+  --fondo: #14151C;
+  --superficie: #1D1F29;
+  --borde: #666A74;
+  --texto: #F3F3F0;
+  --texto-2: #A3A6B3;
+  --placeholder: #8A8E99;
+  --aviso-bg: #3B3215;
+  --aviso-texto: #F5D778;
+  --error-bg: #3B2424;
+  --error-texto: #F5A3A3;
+  --ok-bg: #1E3122;
+  --ok-texto: #A6E3A6;
+  --foco: #ffd700;
+
+  /* reproductor: tarjeta oscura fija en ambos temas */
+  --rep-bg: #14151C;
+  --rep-elevada: #1D1F29;
+  --rep-texto: #F3F3F0;
+  --rep-texto-2: #A3A6B3;
+
+  color-scheme: dark;
+}
+
+html[data-theme="light"] {
+  --fondo: #F4F4EF;
+  --superficie: #FFFFFF;
+  --borde: #84847C;
+  --texto: #14151C;
+  --texto-2: #5B5E6B;
+  --placeholder: #6B707B;
+  --aviso-bg: #F7E7C3;
+  --aviso-texto: #5F4700;
+  --error-bg: #F9DDDD;
+  --error-texto: #7A2A2A;
+  --ok-bg: #DDEEDD;
+  --ok-texto: #24582A;
+  --foco: #14151C;
+
+  color-scheme: light;
+}
+
+/* Icono del tema: en oscuro se muestra el sol (para cambiar a claro). */
+html[data-theme="dark"] .icono-luna { display: none; }
+html[data-theme="light"] .icono-sol { display: none; }
+
 body {
   font-family: system-ui, -apple-system, sans-serif;
-  background: #0a0a0f;
-  color: #e0e0e0;
+  background: var(--fondo);
+  color: var(--texto);
   min-height: 100vh;
   min-height: 100dvh;
   overflow: hidden;
@@ -406,6 +479,30 @@ nav {
 
 .tab-btn:hover:not(.active) {
   background: rgba(70, 70, 100, 0.7);
+}
+
+/* Botón de icono (tema, favoritos y cuenta): 44 px con SVG en línea. */
+.btn-icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-s);
+  color: var(--texto);
+  cursor: pointer;
+}
+
+.btn-icono:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.btn-icono:focus-visible {
+  outline: 2px solid var(--foco);
+  outline-offset: 2px;
 }
 
 /* --- Cuenta, favoritos y modal (elementos nuevos) --- */
