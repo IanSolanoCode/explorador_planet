@@ -11,6 +11,18 @@ import { crearBotonFavorito } from './favoritos.js';
 import { crearBotonBloquear } from './admin.js';
 import { mostrarHoja } from './hoja.js';
 
+// Esqueleto de carga (barras) mientras llegan los datos.
+function mostrarEsqueleto(sidebar) {
+  const lista = document.createElement('ul');
+  lista.className = 'emisoras esqueleto';
+  for (let i = 0; i < 4; i++) {
+    const item = document.createElement('li');
+    item.className = 'esqueleto-item';
+    lista.appendChild(item);
+  }
+  sidebar.appendChild(lista);
+}
+
 function actualizarPanel(props, datosRadio = null) {
   const iso2 = getIso2(props);
   const codigo = document.getElementById('country-code');
@@ -38,6 +50,7 @@ function actualizarPanel(props, datosRadio = null) {
     if (datosRadio.loading) {
       codigo.textContent = 'Cargando...';
       codigo.className = 'conectando';
+      mostrarEsqueleto(sidebar);
     } else if (datosRadio.error) {
       codigo.textContent = `No se pudo cargar la radio, intenta de nuevo`;
       codigo.className = 'error';
@@ -160,6 +173,7 @@ function actualizarPanelTv(props, datos = null) {
   if (datos.loading) {
     codigo.textContent = 'Cargando...';
     codigo.className = 'conectando';
+    mostrarEsqueleto(sidebar);
     return;
   }
 
