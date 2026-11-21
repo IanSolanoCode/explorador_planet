@@ -302,19 +302,19 @@ function renderFavoritosPanel(estado = {}) {
 
   if (estado.sinSesion) {
     codigo.textContent = 'Inicia sesión para ver tus favoritos.';
-    codigo.style.color = '#aaa';
+    codigo.className = 'secundario';
     return;
   }
 
   if (estado.cargando) {
     codigo.textContent = 'Cargando favoritos...';
-    codigo.style.color = '#ffd700';
+    codigo.className = 'conectando';
     return;
   }
 
   if (estado.error) {
     codigo.textContent = 'No se pudieron cargar tus favoritos. Inténtalo de nuevo.';
-    codigo.style.color = '#ff9999';
+    codigo.className = 'error';
     return;
   }
 
@@ -323,12 +323,12 @@ function renderFavoritosPanel(estado = {}) {
 
   if (!items.length) {
     codigo.textContent = 'Todavía no tienes favoritos.';
-    codigo.style.color = '#aaa';
+    codigo.className = 'secundario';
     return;
   }
 
   codigo.textContent = `${items.length} favorito${items.length === 1 ? '' : 's'}`;
-  codigo.style.color = '#e0e0e0';
+  codigo.className = 'iso';
 
   const lista = document.createElement('ul');
   lista.className = 'emisoras favoritos';

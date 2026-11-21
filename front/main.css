@@ -174,20 +174,47 @@ aside.auto-plegada {
 
 .hoja-asa:focus-visible,
 .hoja-cerrar:focus-visible {
-  outline: 2px solid #ffd700;
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
 aside h3 {
-  font-size: 1.2rem;
-  margin-bottom: 6px;
-  color: #ffd700;
+  font-size: var(--fs-20);
+  margin-bottom: var(--esp-2);
+  color: var(--texto);
+  font-weight: var(--fw-700);
 }
 
 aside p {
-  font-size: 0.875rem;
-  color: #aaa;
-  margin-bottom: 12px;
+  font-size: var(--fs-14);
+  color: var(--texto-2);
+  margin-bottom: var(--esp-3);
+}
+
+aside p:empty {
+  display: none;
+}
+
+/* Código ISO como píldora; los estados usan colores de texto del tema. */
+aside p.iso {
+  display: inline-block;
+  padding: 2px 12px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  color: var(--texto);
+}
+
+aside p.error {
+  color: var(--error-texto);
+}
+
+aside p.conectando {
+  color: var(--aviso-texto);
+}
+
+aside p.secundario {
+  color: var(--texto-2);
 }
 
 /* Lista de emisoras como tarjetas */
@@ -203,57 +230,82 @@ aside p {
 }
 
 .emisora {
-  border: 1px solid rgba(120, 140, 200, 0.25);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.04);
-  transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-m);
+  background: transparent;
+  transition: background 0.2s ease, border-color 0.2s ease;
 }
 
 .emisora:hover {
-  background: rgba(255, 255, 255, 0.09);
-  border-color: rgba(160, 190, 255, 0.45);
-  transform: translateX(2px);
+  background: rgba(127, 127, 127, 0.10);
 }
 
 .emisora.activa {
-  background: rgba(255, 215, 0, 0.10);
-  border-color: #ffd700;
+  background: rgba(127, 127, 127, 0.08);
+  border-color: var(--acento);
 }
 
 .emisora-boton {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: var(--esp-3);
   width: 100%;
-  padding: 8px 10px;
+  padding: var(--esp-2) var(--esp-3);
   background: none;
   border: 0;
-  color: #e0e0e0;
+  color: var(--texto);
   font: inherit;
-  font-size: 0.8rem;
+  font-size: var(--fs-14);
   text-align: left;
   cursor: pointer;
 }
 
 .emisora-logo {
-  width: 20px;
-  height: 20px;
-  flex: 0 0 20px;
-  border-radius: 50%;
+  width: 48px;
+  height: 48px;
+  flex: 0 0 48px;
+  border-radius: var(--radio-s);
   object-fit: cover;
-  font-size: 1rem;
-  line-height: 20px;
+  font-size: 1.6rem;
+  line-height: 48px;
   text-align: center;
+  background: var(--fondo);
 }
 
 .emisora-nombre {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-weight: var(--fw-500);
 }
 
+/* Indicador "sonando": barras animadas, solo CSS. */
 .emisora.activa .emisora-nombre {
-  color: #ffd700;
+  color: var(--texto);
+}
+
+.emisora.activa .emisora-nombre::before {
+  content: '';
+  display: inline-block;
+  width: 12px;
+  height: 12px;
+  margin-right: 6px;
+  vertical-align: -2px;
+  background:
+    linear-gradient(var(--acento), var(--acento)) 0 2px / 3px 8px no-repeat,
+    linear-gradient(var(--acento), var(--acento)) 4.5px 0 / 3px 12px no-repeat,
+    linear-gradient(var(--acento), var(--acento)) 9px 4px / 3px 4px no-repeat;
+  animation: sonando 0.8s ease-in-out infinite alternate;
+}
+
+@keyframes sonando {
+  to { transform: scaleY(0.4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .emisora.activa .emisora-nombre::before {
+    animation: none;
+  }
 }
 
 /* Mini reproductor fijo: visible mientras haya una emisora */
@@ -363,8 +415,8 @@ aside p {
 
 .btn-control:focus-visible,
 .emisora-boton:focus-visible,
-.tab-btn:focus-visible {
-  outline: 2px solid #ffd700;
+.segmentado .tab-btn:focus-visible {
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
@@ -410,8 +462,15 @@ aside p {
 }
 
 .canal-categoria {
-  font-size: 0.68rem;
-  color: #8f9bb3;
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 2px 8px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  color: var(--texto-2);
+  font-size: var(--fs-12);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -419,11 +478,12 @@ aside p {
 
 .canal-aviso {
   flex: 0 0 auto;
-  padding: 1px 5px;
-  border: 1px solid rgba(255, 180, 84, 0.45);
-  border-radius: 4px;
-  color: #ffb454;
-  font-size: 0.65rem;
+  padding: 2px 8px;
+  background: var(--aviso-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radio-pildora);
+  color: var(--aviso-texto);
+  font-size: var(--fs-12);
   white-space: nowrap;
 }
 
@@ -621,29 +681,29 @@ nav.segmentado {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  margin: 0 6px 0 0;
+  width: 44px;
+  height: 44px;
+  margin: 0 4px 0 0;
   padding: 0;
   background: transparent;
   border: 1px solid transparent;
-  border-radius: 50%;
-  color: #8f9bb3;
-  font-size: 1rem;
+  border-radius: var(--radio-s);
+  color: var(--texto-2);
+  font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
   transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
 }
 
 .btn-favorito:hover {
-  color: #ffd700;
-  background: rgba(255, 215, 0, 0.08);
-  border-color: rgba(255, 215, 0, 0.28);
+  color: var(--acento);
+  background: rgba(127, 127, 127, 0.08);
+  border-color: transparent;
 }
 
 .btn-favorito.activo,
 .btn-favorito[aria-pressed="true"] {
-  color: #ffd700;
+  color: var(--acento);
 }
 
 .btn-favorito:disabled {
@@ -671,8 +731,15 @@ nav.segmentado {
 }
 
 .favorito-tipo {
-  font-size: 0.68rem;
-  color: #8f9bb3;
+  display: inline-block;
+  align-self: flex-start;
+  max-width: 100%;
+  padding: 2px 8px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  color: var(--texto-2);
+  font-size: var(--fs-12);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -787,7 +854,7 @@ nav.segmentado {
 }
 
 .auth-campo input:focus-visible {
-  outline: 2px solid #ffd700;
+  outline: 2px solid var(--foco);
   outline-offset: 1px;
 }
 
@@ -880,26 +947,26 @@ body.es-admin .btn-bloquear {
 /* Botón Bloquear dentro de la tarjeta: mismo patrón que el corazón. */
 .btn-bloquear {
   flex: 0 0 auto;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   margin: 0 6px 0 0;
-  padding: 3px 8px;
-  background: transparent;
-  border: 1px solid rgba(255, 153, 153, 0.35);
-  border-radius: 6px;
-  color: #ffb3b3;
+  padding: 6px 10px;
+  background: var(--error-bg);
+  border: 1px solid transparent;
+  border-radius: var(--radio-pildora);
+  color: var(--error-texto);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: var(--fs-12);
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .btn-bloquear:hover {
-  color: #ffd700;
-  background: rgba(255, 215, 0, 0.08);
-  border-color: rgba(255, 215, 0, 0.4);
+  background: var(--error-bg);
+  filter: brightness(1.1);
 }
 
 .btn-bloquear:disabled {
@@ -912,7 +979,7 @@ body.es-admin .btn-bloquear {
 .bloqueo-cancelar:focus-visible,
 .bloqueo-confirmar:focus-visible,
 .modal-bloqueo__cerrar:focus-visible {
-  outline: 2px solid #ffd700;
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 
@@ -956,19 +1023,19 @@ body.es-admin .btn-bloquear {
 .btn-desbloquear {
   flex: 0 0 auto;
   margin: 0 6px 0 0;
-  padding: 4px 8px;
-  background: rgba(255, 215, 0, 0.08);
-  border: 1px solid rgba(255, 215, 0, 0.35);
-  border-radius: 6px;
-  color: #ffd700;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio-pildora);
+  color: var(--texto);
   font: inherit;
-  font-size: 0.68rem;
+  font-size: var(--fs-12);
   cursor: pointer;
   white-space: nowrap;
 }
 
 .btn-desbloquear:hover {
-  background: rgba(255, 215, 0, 0.16);
+  background: rgba(127, 127, 127, 0.10);
 }
 
 .btn-desbloquear:disabled {
@@ -1062,7 +1129,7 @@ body.es-admin .btn-bloquear {
 }
 
 .bloqueo-form textarea:focus-visible {
-  outline: 2px solid #ffd700;
+  outline: 2px solid var(--foco);
   outline-offset: 1px;
 }
 
@@ -1365,7 +1432,7 @@ body.es-admin .btn-bloquear {
 }
 
 .reproductor-cerrar:focus-visible {
-  outline: 2px solid #ffd700;
+  outline: 2px solid var(--foco);
   outline-offset: 2px;
 }
 

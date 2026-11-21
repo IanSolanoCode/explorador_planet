@@ -88,11 +88,11 @@ function actualizarContadorBloqueos() {
   const restantes = sidebar.querySelectorAll('.bloqueos .bloqueo-item').length;
   if (!restantes) {
     codigo.textContent = 'No hay contenido bloqueado.';
-    codigo.style.color = '#aaa';
+    codigo.className = 'secundario';
     return;
   }
   codigo.textContent = `${restantes} bloqueo${restantes === 1 ? '' : 's'}`;
-  codigo.style.color = '#e0e0e0';
+  codigo.className = 'iso';
 }
 
 function renderBloqueosPanel(estado = {}) {
@@ -110,31 +110,31 @@ function renderBloqueosPanel(estado = {}) {
 
   if (estado.sinPermiso) {
     codigo.textContent = 'No tienes permisos de administrador';
-    codigo.style.color = '#ff9999';
+    codigo.className = 'error';
     return;
   }
 
   if (estado.cargando) {
     codigo.textContent = 'Cargando bloqueos...';
-    codigo.style.color = '#ffd700';
+    codigo.className = 'conectando';
     return;
   }
 
   if (estado.error) {
     codigo.textContent = 'No se pudieron cargar los bloqueos. Inténtalo de nuevo.';
-    codigo.style.color = '#ff9999';
+    codigo.className = 'error';
     return;
   }
 
   const lista = Array.isArray(estado.lista) ? estado.lista : [];
   if (!lista.length) {
     codigo.textContent = 'No hay contenido bloqueado.';
-    codigo.style.color = '#aaa';
+    codigo.className = 'secundario';
     return;
   }
 
   codigo.textContent = `${lista.length} bloqueo${lista.length === 1 ? '' : 's'}`;
-  codigo.style.color = '#e0e0e0';
+  codigo.className = 'iso';
 
   const ul = document.createElement('ul');
   ul.className = 'emisoras bloqueos';

@@ -27,33 +27,33 @@ function actualizarPanel(props, datosRadio = null) {
   // Mostrar código ISO o mensaje si no tiene código
   if (iso2) {
     codigo.textContent = `Código ISO-2: ${iso2}`;
-    codigo.style.color = '#e0e0e0';
+    codigo.className = 'iso';
   } else {
     codigo.textContent = 'Este territorio no tiene código de país';
-    codigo.style.color = '#ff9999';
+    codigo.className = 'error';
   }
 
   // Gestionar sección "Reproduciendo"
   if (leerEstado('modoActual') === 'radio' && datosRadio) {
     if (datosRadio.loading) {
       codigo.textContent = 'Cargando...';
-      codigo.style.color = '#ffd700';
+      codigo.className = 'conectando';
     } else if (datosRadio.error) {
       codigo.textContent = `No se pudo cargar la radio, intenta de nuevo`;
-      codigo.style.color = '#ff9999';
+      codigo.className = 'error';
     } else if (datosRadio.vacio) {
       codigo.textContent = 'Sin emisoras para este país';
-      codigo.style.color = '#aaa';
+      codigo.className = 'secundario';
     } else if (datosRadio.cancelled) {
       // Petición cancelada, no hacer nada, mantener estado actual
       return;
     } else if (!iso2) {
       codigo.textContent = 'Este territorio no tiene código de país';
-      codigo.style.color = '#ff9999';
+      codigo.className = 'error';
     } else {
       // Mostrar lista de emisoras
       codigo.textContent = '';
-      codigo.style.color = '#e0e0e0';
+      codigo.className = 'iso';
       // Construir lista con createElement (no innerHTML con datos API)
       const lista = document.createElement('ul');
       lista.className = 'emisoras';
@@ -121,7 +121,7 @@ function actualizarPanel(props, datosRadio = null) {
     // No hay datos todavía o país sin código
     if (!iso2) {
       codigo.textContent = 'Este territorio no tiene código de país';
-      codigo.style.color = '#ff9999';
+      codigo.className = 'error';
     }
   }
 
@@ -148,10 +148,10 @@ function actualizarPanelTv(props, datos = null) {
 
   if (iso2) {
     codigo.textContent = `Código ISO-2: ${iso2}`;
-    codigo.style.color = '#e0e0e0';
+    codigo.className = 'iso';
   } else {
     codigo.textContent = 'Este territorio no tiene código de país';
-    codigo.style.color = '#ff9999';
+    codigo.className = 'error';
     return;
   }
 
@@ -159,24 +159,24 @@ function actualizarPanelTv(props, datos = null) {
 
   if (datos.loading) {
     codigo.textContent = 'Cargando...';
-    codigo.style.color = '#ffd700';
+    codigo.className = 'conectando';
     return;
   }
 
   if (datos.error) {
     codigo.textContent = `No se pudo cargar la TV desde ${datos.url}`;
-    codigo.style.color = '#ff9999';
+    codigo.className = 'error';
     return;
   }
 
   if (datos.vacio) {
     codigo.textContent = 'Sin canales para este país';
-    codigo.style.color = '#aaa';
+    codigo.className = 'secundario';
     return;
   }
 
   codigo.textContent = '';
-  codigo.style.color = '#e0e0e0';
+  codigo.className = 'iso';
 
   // Tarjetas construidas solo con createElement/textContent (datos de la API).
   const lista = document.createElement('ul');

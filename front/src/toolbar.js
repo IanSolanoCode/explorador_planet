@@ -35,7 +35,7 @@ function setupToolbar() {
         if (!feature) {
           const codigo = document.getElementById('country-code');
           codigo.textContent = 'Selecciona un país para ver canales de TV';
-          codigo.style.color = '#aaa';
+          codigo.className = 'secundario';
         } else {
           const iso2 = getIso2(feature.properties);
           if (iso2) {
