@@ -7,6 +7,7 @@
 - datasets/geo-countries para los datos GeoJSON de países
 - hls.js (carga dinámica) para las transmisiones TV en vivo
 - CSS simple (arquitectura BEM no aplicable, estilos en un solo archivo)
+- Nunito (variable, OFL) autoalojada en `public/fonts/` como subconjunto latino woff2
 - eslint como devDependency, solo para `no-undef` y `no-unused-vars`
 
 ## Puesta en marcha
@@ -47,6 +48,7 @@ front/
 │   ├── registro.js     # Registro de detenedores y oyentes de sesión
 │   ├── utils.js        # API_BASE, volumen y logos
 │   ├── paises.js       # Códigos ISO-2 y nombres de países
+│   ├── tema.js         # Tema claro/oscuro (data-theme, localStorage, prefers-color-scheme)
 │   ├── api.js          # peticionApi, mostrarAviso y hook del 401
 │   ├── radio.js        # Carga de emisoras con AbortController
 │   ├── tv.js           # Carga de canales con AbortController
@@ -96,12 +98,13 @@ así las listas ya pintadas se actualizan al cambiar de sesión sin re-renderiza
 
 ## Diseño responsivo
 
+- **Sistema de diseño**: tokens CSS en `:root` (radios 12/16/24/píldora, espaciado 4–32, tipografía 12–28, paletas oscura y clara, acento dorado solo como relleno con texto oscuro). Tema mediante `html[data-theme]` y `color-scheme`; sin elección sigue `prefers-color-scheme`, con elección se guarda en `localStorage` (try/catch). Script mínimo en el `<head>` fija el tema antes de pintar (anotado por si se adopta CSP). El globo y el cielo no cambian con el tema.
 - **Mobile-first**: la base de `main.css` es para pantallas angostas; `@media (min-width: 768px)` restaura tablet/escritorio. `100vh` convive con `100dvh` (respaldo) y se respetan los `env(safe-area-inset-*)`.
 - **Hoja inferior**: por debajo de 768 px, el `aside#sidebar` es una bottom sheet (`max-height: 55dvh`, scroll interno) con asa (plegar/expandir) y botón de cerrar; se abre con cualquier contenido (país, "Mis favoritos" o "Bloqueos") y se pliega sin destruir el contenido. En escritorio vuelve a ser columna derecha.
 - **Paisaje corto**: `@media (orientation: landscape) and (max-height: 500px)` convierte el panel en columna lateral (~320 px) y limita la TV a ~45dvh.
 - **Apilado**: la hoja sube por encima de la barra de radio con `:has()`; el respaldo sin `:has()` usa `--altura-reproductor` actualizado por JS.
 - **Pantalla completa**: `requestFullscreen`/`webkitRequestFullscreen`; en iPhone se usa `video.webkitEnterFullscreen()` solo para el video. Si no hay ninguna vía, se oculta el botón.
-- **Movimiento reducido**: `@media (prefers-reduced-motion: reduce)` desactiva las transiciones del panel y los reproductores.
+- **Movimiento reducido**: `@media (prefers-reduced-motion: reduce)` desactiva las transiciones del panel, los reproductores y el indicador "sonando". `@media (forced-colors: active)` fuerza bordes visibles.
 - **Reproductor en móvil**: botón **X** (`Cerrar reproductor`, 44 px) en la esquina; botón **Minimizar** (estado `minimizado` compartido entre radio y TV, conservado al cambiar de contenido y reseteado solo con la X). TV minimizada = miniatura 140×16:9 (el `<video>` no se destruye: solo CSS + clase); radio minimizada = barra delgada. La hoja reserva un margen inferior igual a la altura real del reproductor (`--altura-reproductor`) y a la barra superior (`--altura-barra`), medidas por un `ResizeObserver` en `hoja.js` que **nunca observa la hoja**. Escape cierra el reproductor expandido solo si el foco está dentro y no hay modal ni pantalla completa.
 
 ## Manejo de códigos ISO-2
