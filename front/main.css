@@ -317,15 +317,14 @@ aside p.secundario {
   z-index: 120;
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: var(--esp-3);
   width: 100%;
-  padding: 10px 12px;
-  padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
-  background: rgba(10, 10, 15, 0.9);
-  border: 1px solid #3a3a5a;
+  padding: var(--esp-3);
+  padding-bottom: calc(var(--esp-3) + env(safe-area-inset-bottom, 0px));
+  background: var(--rep-elevada);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   border-bottom: 0;
   border-radius: 0;
-  backdrop-filter: blur(10px);
   box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.45);
   transition: width 0.2s ease, height 0.2s ease, padding 0.2s ease;
 }
@@ -354,35 +353,35 @@ aside p.secundario {
 }
 
 .reproductor-nombre {
-  font-size: 0.85rem;
-  font-weight: 600;
-  color: #ffd700;
+  font-size: var(--fs-14);
+  font-weight: var(--fw-600);
+  color: var(--rep-texto);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
 .reproductor-estado {
-  font-size: 0.72rem;
-  color: #aaa;
+  font-size: var(--fs-12);
+  color: var(--rep-texto-2);
 }
 
 .reproductor[data-estado="conectando"] .reproductor-estado {
-  color: #ffd700;
+  color: #F5D778;
 }
 
 .reproductor[data-estado="reproduciendo"] .reproductor-estado {
-  color: #7ee787;
+  color: #A6E3A6;
 }
 
 .reproductor[data-estado="error"] .reproductor-estado {
-  color: #ff9999;
+  color: #F5A3A3;
 }
 
 .reproductor-controles {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: var(--esp-2);
   flex: 0 0 auto;
 }
 
@@ -390,21 +389,32 @@ aside p.secundario {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid #4a4a7a;
-  border-radius: 6px;
-  color: #e0e0e0;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radio-s);
+  color: var(--rep-texto);
   font-size: 0.9rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .btn-control:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: #6a6a9a;
+  background: rgba(255, 255, 255, 0.16);
+}
+
+/* Botón de reproducir/pausar: relleno de acento con texto oscuro. */
+.reproductor-pausa {
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--acento-texto);
+}
+
+.reproductor-pausa:hover {
+  background: var(--acento);
+  filter: brightness(1.05);
 }
 
 .reproductor-controles input[type="range"] {
@@ -1254,9 +1264,9 @@ body.es-admin .btn-bloquear {
     right: auto;
     bottom: 20px;
     width: min(420px, calc(100vw - 40px));
-    padding: 12px 14px;
-    border: 1px solid #3a3a5a;
-    border-radius: 10px;
+    padding: var(--esp-3);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: var(--radio-m);
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
   }
 
@@ -1416,19 +1426,18 @@ body.es-admin .btn-bloquear {
   flex: 0 0 auto;
   width: 44px;
   height: 44px;
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid #4a4a7a;
-  border-radius: 6px;
-  color: #e0e0e0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: var(--radio-s);
+  color: var(--rep-texto);
   font-size: 1.4rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.2s ease, border-color 0.2s ease;
+  transition: background 0.2s ease;
 }
 
 .reproductor-cerrar:hover {
-  background: rgba(255, 255, 255, 0.14);
-  border-color: #6a6a9a;
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .reproductor-cerrar:focus-visible {
