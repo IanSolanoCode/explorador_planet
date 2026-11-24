@@ -33,6 +33,21 @@ export function crearBotonMinimizar(alAlternar) {
   return boton;
 }
 
+// Icono de altavoz con currentColor (sigue el tema). Con `mudo` dibuja la barra.
+export function crearIconoAltavoz(mudo) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '20');
+  svg.setAttribute('height', '20');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  // SVG estático escrito a mano; no hay datos de la API.
+  svg.innerHTML = mudo
+    ? '<path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M16 9l5 6M21 9l-5 6"/>'
+    : '<path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3z"/><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M15 8.5a4.5 4.5 0 0 1 0 7M17.8 6a8 8 0 0 1 0 12"/>';
+  return svg;
+}
+
 // Refleja el estado minimizado compartido en la clase y en el aria.
 export function aplicarMinimizado(contenedor, btnMinimizar) {
   const minimizado = !!leerEstado('reproductorMinimizado');

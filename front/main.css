@@ -30,6 +30,8 @@
   /* acento: solo como relleno con texto oscuro */
   --acento: #ffd700;
   --acento-texto: #111111;
+  /* acento para iconos/líneas finas (visible en ambos temas) */
+  --acento-icono: #ffd700;
 
   /* tema oscuro (por defecto) */
   --fondo: #14151C;
@@ -69,6 +71,7 @@ html[data-theme="light"] {
   --ok-bg: #DDEEDD;
   --ok-texto: #24582A;
   --foco: #14151C;
+  --acento-icono: #8a6d00;
 
   color-scheme: light;
 }
@@ -156,7 +159,8 @@ aside.auto-plegada {
   width: 44px;
   height: 5px;
   border-radius: 3px;
-  background: rgba(255, 255, 255, 0.4);
+  background: var(--texto-2);
+  opacity: 0.55;
 }
 
 .hoja-cerrar {
@@ -168,7 +172,7 @@ aside.auto-plegada {
   background: transparent;
   border: 1px solid transparent;
   border-radius: 8px;
-  color: #aaa;
+  color: var(--texto-2);
   font-size: 1.5rem;
   line-height: 1;
   cursor: pointer;
@@ -176,8 +180,8 @@ aside.auto-plegada {
 }
 
 .hoja-cerrar:hover {
-  color: #e0e0e0;
-  background: rgba(255, 255, 255, 0.08);
+  color: var(--texto);
+  background: rgba(127, 127, 127, 0.10);
 }
 
 .hoja-asa:focus-visible,
@@ -271,7 +275,7 @@ aside p.secundario {
 
 .emisora.activa {
   background: rgba(127, 127, 127, 0.08);
-  border-color: var(--acento);
+  border-color: var(--acento-icono);
 }
 
 .emisora-boton {
@@ -321,9 +325,9 @@ aside p.secundario {
   margin-right: 6px;
   vertical-align: -2px;
   background:
-    linear-gradient(var(--acento), var(--acento)) 0 2px / 3px 8px no-repeat,
-    linear-gradient(var(--acento), var(--acento)) 4.5px 0 / 3px 12px no-repeat,
-    linear-gradient(var(--acento), var(--acento)) 9px 4px / 3px 4px no-repeat;
+    linear-gradient(var(--acento-icono), var(--acento-icono)) 0 2px / 3px 8px no-repeat,
+    linear-gradient(var(--acento-icono), var(--acento-icono)) 4.5px 0 / 3px 12px no-repeat,
+    linear-gradient(var(--acento-icono), var(--acento-icono)) 9px 4px / 3px 4px no-repeat;
   animation: sonando 0.8s ease-in-out infinite alternate;
 }
 
@@ -608,7 +612,9 @@ nav.segmentado {
   width: 44px;
   height: 44px;
   padding: 0;
-  background: transparent;
+  /* Superficie propia casi opaca: el icono no depende de lo que haya detrás. */
+  background: var(--superficie);
+  background: color-mix(in srgb, var(--superficie) 90%, transparent);
   border: 1px solid var(--borde);
   border-radius: var(--radio-s);
   color: var(--texto);
@@ -616,7 +622,8 @@ nav.segmentado {
 }
 
 .btn-icono:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--superficie);
+  filter: brightness(1.12);
 }
 
 .btn-icono:focus-visible {
@@ -645,7 +652,9 @@ nav.segmentado {
   gap: var(--esp-2);
   height: 44px;
   padding: 0 12px;
-  background: transparent;
+  /* Superficie propia casi opaca: el icono no depende de lo que haya detrás. */
+  background: var(--superficie);
+  background: color-mix(in srgb, var(--superficie) 90%, transparent);
   border: 1px solid var(--borde);
   border-radius: var(--radio-s);
   color: var(--texto);
@@ -655,7 +664,8 @@ nav.segmentado {
 }
 
 .btn-cuenta:hover {
-  background: rgba(255, 255, 255, 0.06);
+  background: var(--superficie);
+  filter: brightness(1.12);
 }
 
 .cuenta-nombre {
@@ -740,14 +750,17 @@ nav.segmentado {
 }
 
 .btn-favorito:hover {
-  color: var(--acento);
-  background: rgba(127, 127, 127, 0.08);
+  color: var(--texto);
+  background: rgba(127, 127, 127, 0.10);
   border-color: transparent;
 }
 
+/* Favorito: relleno frente a contorno, no solo color. */
 .btn-favorito.activo,
 .btn-favorito[aria-pressed="true"] {
-  color: var(--acento);
+  background: var(--acento);
+  border-color: var(--acento);
+  color: var(--acento-texto);
 }
 
 .btn-favorito:disabled {

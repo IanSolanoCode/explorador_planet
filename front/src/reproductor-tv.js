@@ -11,6 +11,7 @@ import {
   crearBotonMinimizar,
   aplicarMinimizado,
   alternarMinimizado,
+  crearIconoAltavoz,
 } from './reproductor-ui.js';
 
 // TV: estado independiente del reproductor de radio.
@@ -42,7 +43,8 @@ function actualizarBotonPausaTv() {
 function actualizarBotonSilencioTv() {
   if (!reproductorTvEls) return;
   const mudo = !!(videoActual && videoActual.muted);
-  reproductorTvEls.btnMute.textContent = mudo ? '🔇' : '🔊';
+  reproductorTvEls.btnMute.textContent = '';
+  reproductorTvEls.btnMute.appendChild(crearIconoAltavoz(mudo));
   reproductorTvEls.btnMute.setAttribute('aria-label', mudo ? 'Activar sonido' : 'Silenciar');
   reproductorTvEls.btnMute.setAttribute('aria-pressed', mudo ? 'true' : 'false');
 }
@@ -160,7 +162,7 @@ function crearReproductorTv() {
   btnMute.className = 'btn-control reproductor-mute';
   btnMute.setAttribute('aria-label', 'Silenciar');
   btnMute.setAttribute('aria-pressed', 'false');
-  btnMute.textContent = '🔊';
+  btnMute.appendChild(crearIconoAltavoz(false));
   btnMute.addEventListener('click', alternarSilencioTv);
 
   const volumen = document.createElement('input');

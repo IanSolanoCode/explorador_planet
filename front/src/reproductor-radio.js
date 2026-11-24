@@ -10,6 +10,7 @@ import {
   crearBotonMinimizar,
   aplicarMinimizado,
   alternarMinimizado,
+  crearIconoAltavoz,
 } from './reproductor-ui.js';
 
 let audioActual = null;
@@ -53,7 +54,7 @@ function crearReproductor() {
   btnMute.className = 'btn-control reproductor-mute';
   btnMute.setAttribute('aria-label', 'Silenciar');
   btnMute.setAttribute('aria-pressed', 'false');
-  btnMute.textContent = '🔊';
+  btnMute.appendChild(crearIconoAltavoz(false));
   btnMute.addEventListener('click', alternarSilencio);
 
   const volumen = document.createElement('input');
@@ -136,7 +137,8 @@ function actualizarBotonPausa() {
 function actualizarBotonSilencio() {
   if (!reproductorEls) return;
   const mudo = !!(audioActual && audioActual.muted);
-  reproductorEls.btnMute.textContent = mudo ? '🔇' : '🔊';
+  reproductorEls.btnMute.textContent = '';
+  reproductorEls.btnMute.appendChild(crearIconoAltavoz(mudo));
   reproductorEls.btnMute.setAttribute('aria-label', mudo ? 'Activar sonido' : 'Silenciar');
   reproductorEls.btnMute.setAttribute('aria-pressed', mudo ? 'true' : 'false');
 }
