@@ -1010,10 +1010,11 @@ body.es-admin .btn-bloquear {
   display: inline-flex;
 }
 
-/* Botón Bloquear dentro de la tarjeta: mismo patrón que el corazón. */
+/* Botón Bloquear dentro de la tarjeta: mismo patrón que el corazón.
+   Nota: sin `display` propio; la visibilidad la controla `.btn-bloquear`
+   (display:none) y `body.es-admin .btn-bloquear` (display:inline-flex). */
 .btn-bloquear {
   flex: 0 0 auto;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   margin: 0 6px 0 0;
